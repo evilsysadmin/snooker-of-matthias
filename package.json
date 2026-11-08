@@ -7,12 +7,14 @@
     "dev": "vite --host 0.0.0.0",
     "test": "node --test src/physics.test.js",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "smoke": "node e2e/smoke.mjs"
   },
   "dependencies": {
     "three": "0.170.0"
   },
   "devDependencies": {
-    "vite": "5.4.12"
+    "vite": "5.4.12",
+    "@playwright/test": "1.56.1"
   }
 }

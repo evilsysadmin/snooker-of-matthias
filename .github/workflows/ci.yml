@@ -27,6 +27,26 @@ jobs:
         run: npm test
       - name: Production 3D build
         run: npm run build
+      - name: Install Chromium for a real WebGL smoke
+        run: npx playwright install --with-deps chromium
+      - name: Exercise desktop and mobile 3D browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/snooker-preview.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          npm run smoke
+      - name: Upload browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snooker-desktop-mobile
+          path: .artifacts/*.png
+          if-no-files-found: warn
+          retention-days: 7
       - name: Attach Cloudflare Pages-ready dist (not a deployment)
         uses: actions/upload-artifact@v4
         with:
