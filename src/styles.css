@@ -12,7 +12,7 @@ body { margin: 0; overflow: hidden; }
 button, input { font: inherit; }
 button:focus-visible, input:focus-visible { outline: 2px solid #e4c987; outline-offset: 4px; }
 .game { position: relative; height: 100dvh; min-height: 380px; overflow: hidden; isolation: isolate; }
-#viewport { position: absolute; inset: 100px 0 205px; }
+#viewport { position: absolute; inset: 130px 0 205px; }
 #viewport canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
 .vignette { position: absolute; inset: 0; pointer-events: none; z-index: 1; background: linear-gradient(180deg, rgba(2,11,13,.78) 0%, transparent 23%, transparent 64%, rgba(2,11,13,.85) 100%); }
 .topbar, .bottom-panel, .table-label { position: absolute; z-index: 3; }
