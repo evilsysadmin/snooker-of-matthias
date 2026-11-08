@@ -68,3 +68,10 @@ test('scratched cue is restored only once all the other balls stop', () => {
 test('physics rejects variable steps that would tunnel through collisions', () => {
   assert.throws(() => stepPhysics(createRack(), 0.5), RangeError);
 });
+
+test('zero charge does not produce a shot or move the cue', () => {
+  const balls = createRack();
+  assert.equal(strikeCue(balls, 1, 0, 0), false);
+  assert.equal(balls[0].vx, 0);
+  assert.equal(ballsMoving(balls), false);
+});

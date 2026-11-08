@@ -28,11 +28,23 @@ try {
     );
     assert.ok(dimensions.w >= 350 && dimensions.h >= 500, '3D canvas should have dimensions');
     assert.equal(await page.locator('#shots').innerText(), '00');
+    const layout = await page.evaluate(() => {
+      const rect = (query) => document.querySelector(query).getBoundingClientRect();
+      return { viewport: rect('#viewport'), header: rect('.topbar'), controls: rect('.bottom-panel') };
+    });
+    assert.ok(layout.viewport.top >= layout.header.bottom - 1, 'table viewport clears header');
+    assert.ok(layout.viewport.bottom <= layout.controls.top + 1, 'table viewport clears controls');
     await page.screenshot({
       path: 'artifacts/snooker-' + config.name + '.png', fullPage: true,
       animations: 'disabled',
     });
     await page.locator('#strike').click();
+    await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
+    await page.locator('#restart').click();
+    await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');
+    await page.keyboard.down('Space');
+    await page.waitForFunction(() => Number(document.querySelector('#power')?.value) >= 35);
+    await page.keyboard.up('Space');
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
     await page.locator('#restart').click();
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');

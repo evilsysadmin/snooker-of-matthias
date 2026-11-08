@@ -46,7 +46,8 @@ export function strikeCue(balls, dx, dz, power) {
   const cue = balls.find((ball) => ball.id === 0);
   const length = Math.hypot(dx, dz);
   if (!cue || cue.pocketed || ballsMoving(balls) || length < 0.0001) return false;
-  const strength = Math.max(0.05, Math.min(1, Number(power) || 0.05));
+  const strength = Math.max(0, Math.min(1, Number(power) || 0));
+  if (strength === 0) return false;
   const speed = 2.7 + strength * 8.3;
   cue.vx = dx / length * speed;
   cue.vz = dz / length * speed;

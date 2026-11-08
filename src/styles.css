@@ -12,7 +12,7 @@ body { margin: 0; overflow: hidden; }
 button, input { font: inherit; }
 button:focus-visible, input:focus-visible { outline: 2px solid #e4c987; outline-offset: 4px; }
 .game { position: relative; height: 100dvh; min-height: 380px; overflow: hidden; isolation: isolate; }
-#viewport { position: absolute; inset: 0; }
+#viewport { position: absolute; inset: 100px 0 205px; }
 #viewport canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
 .vignette { position: absolute; inset: 0; pointer-events: none; z-index: 1; background: linear-gradient(180deg, rgba(2,11,13,.78) 0%, transparent 23%, transparent 64%, rgba(2,11,13,.85) 100%); }
 .topbar, .bottom-panel, .table-label { position: absolute; z-index: 3; }
@@ -42,6 +42,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #e4c987; outline-
 .power-heading output { color: #e1c887; letter-spacing: .03em; }
 input[type=range] { appearance: none; background: linear-gradient(to right, #d8b879 var(--progress,55%), #39504c var(--progress,55%)); border: none; height: 5px; border-radius: 9px; width: 100%; cursor: pointer; }
 input[type=range]::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #f6e4bc; border: 3px solid #827044; box-shadow: 0 0 0 4px #101f1e; }
+input[type=range].charging { box-shadow: 0 0 18px #e1c38888; }
 input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #f6e4bc; border: 3px solid #827044; box-shadow: 0 0 0 4px #101f1e; }
 button { border: 0; cursor: pointer; transition: background .2s, transform .2s; }
 button:active { transform: scale(.97); }
@@ -54,6 +55,7 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
 .restart:hover { background: #42645c; }
 .hint { margin: 15px 0 0; color: #91a59a; text-align: center; font-size: 11px; }
 @media (max-width: 700px) {
+  #viewport { top: 70px; bottom: 195px; }
   .topbar { top: max(13px, env(safe-area-inset-top)); left: 13px; right: 13px; gap: 5px; align-items: flex-start; }
   .brand { gap: 8px; }
   .brand-icon { width: 33px; height: 33px; font-size: 18px; }
@@ -79,6 +81,7 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   .hint { font-size: 9px; margin-top: 11px; }
 }
 @media (max-height: 580px) {
+  #viewport { top: 58px; bottom: 150px; }
   .table-label { display: none; }
   .bottom-panel { padding-top: 9px; padding-bottom: 9px; }
   .commentary { margin-bottom: 8px; }
