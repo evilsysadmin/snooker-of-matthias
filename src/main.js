@@ -305,10 +305,20 @@ function resize() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
-  const horizontalTan = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect;
-  const distance = Math.max(11.5, 5.4 / Math.max(0.07, horizontalTan));
-  camera.position.set(-0.5, distance * 0.78, distance * 0.72);
-  camera.lookAt(0, -0.05, 0);
+  const verticalTan = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+  const horizontalTan = verticalTan * camera.aspect;
+  if (height > width * 1.3 && width <= 700) {
+    // Rotate screen-up, not the table: long axis fills a portrait phone.
+    const distance = Math.max(19.5, 5.8 / verticalTan, 2.9 / Math.max(0.07, horizontalTan));
+    camera.up.set(1, 0, 0);
+    camera.position.set(0, distance * 0.87, distance * 0.50);
+    camera.lookAt(-0.75, -0.05, 0);
+  } else {
+    const distance = Math.max(11.5, 5.4 / Math.max(0.07, horizontalTan));
+    camera.up.set(0, 1, 0);
+    camera.position.set(-0.5, distance * 0.78, distance * 0.72);
+    camera.lookAt(0, -0.05, 0);
+  }
   camera.updateProjectionMatrix();
 }
 new ResizeObserver(resize).observe(viewport);
