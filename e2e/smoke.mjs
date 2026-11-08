@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { chromium } from '@playwright/test';
 
-mkdirSync('.artifacts', { recursive: true });
+mkdirSync('artifacts', { recursive: true });
 const browser = await chromium.launch({
   headless: true,
   args: ['--enable-webgl', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
@@ -29,13 +29,13 @@ try {
     assert.ok(dimensions.w >= 350 && dimensions.h >= 500, '3D canvas should have dimensions');
     assert.equal(await page.locator('#shots').innerText(), '00');
     await page.screenshot({
-      path: '.artifacts/snooker-' + config.name + '.png', fullPage: true,
+      path: 'artifacts/snooker-' + config.name + '.png', fullPage: true,
       animations: 'disabled',
     });
     await page.locator('#strike').click();
-    assert.equal(await page.locator('#shots').innerText(), '01');
+    await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
     await page.locator('#restart').click();
-    assert.equal(await page.locator('#shots').innerText(), '00');
+    await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');
     assert.deepEqual(errors, [], config.name + ' browser runtime errors');
     console.log('SNOOKER_BROWSER_' + config.name.toUpperCase() + '_PASS', dimensions);
     await context.close();

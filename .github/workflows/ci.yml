@@ -44,7 +44,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: snooker-desktop-mobile
-          path: .artifacts/*.png
+          path: artifacts/*.png
           if-no-files-found: warn
           retention-days: 7
       - name: Attach Cloudflare Pages-ready dist (not a deployment)
