@@ -1,0 +1,56 @@
+name: Snooker 3D POC · test and build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: snooker-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned direct dependencies
+        run: npm install --no-audit --no-fund
+      - name: Deterministic physics tests
+        run: npm test
+      - name: Production 3D build
+        run: npm run build
+      - name: Install Chromium for a real WebGL smoke
+        run: npx playwright install --with-deps chromium
+      - name: Exercise desktop and mobile 3D browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/snooker-preview.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          npm run smoke
+      - name: Upload browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snooker-desktop-mobile
+          path: artifacts/*.png
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Attach Cloudflare Pages-ready dist (not a deployment)
+        uses: actions/upload-artifact@v4
+        with:
+          name: snooker-web-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
