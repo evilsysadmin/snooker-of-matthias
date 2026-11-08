@@ -3,6 +3,7 @@ import {
   TABLE, POCKETS, createRack, strikeCue, stepPhysics, ballsMoving, respawnCue,
 } from './physics.js';
 import './styles.css';
+import { createShotCharge } from './shotCharge.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -26,11 +27,11 @@ app.innerHTML = [
     '</div></div>',
     '<div class="shot-controls">',
       '<div class="power"><div class="power-heading"><span>POTENCIA</span><output id="power-value" for="power">55%</output></div>',
-      '<input id="power" type="range" min="10" max="100" value="55" aria-label="Potencia del golpe" /></div>',
+      '<input id="power" type="range" min="0" max="100" value="55" aria-label="Potencia del golpe" /></div>',
       '<button id="strike" class="strike" type="button"><span>⚡</span> GOLPEAR <kbd>ESPACIO</kbd></button>',
       '<button id="restart" class="restart" type="button" title="Recolocar las bolas" aria-label="Reiniciar partida">↺</button>',
     '</div>',
-    '<p class="hint">Mueve el ratón o arrastra el dedo sobre la mesa para apuntar. R para reiniciar.</p>',
+    '<p class="hint">Apunta con ratón o dedo. Mantén ESPACIO para cargar: sube y baja; suelta para golpear. R reinicia.</p>',
   '</section>',
   '<div class="vignette" aria-hidden="true"></div>',
   '</main>',
@@ -44,6 +45,7 @@ const strikeButton = document.querySelector('#strike');
 const restartButton = document.querySelector('#restart');
 const powerInput = document.querySelector('#power');
 const powerValue = document.querySelector('#power-value');
+const charge = createShotCharge();
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#071316');
@@ -223,6 +225,8 @@ function formatScore() {
   pocketDisplay.innerHTML = String(potted).padStart(2, '0') + ' <small>/ 15</small>';
 }
 function restart() {
+  charge.cancel();
+  powerInput.classList.remove('charging');
   balls = createRack();
   shots = 0;
   potted = 0;
@@ -231,8 +235,8 @@ function restart() {
   dirtyHUD = true;
   say('Matthias: Otra oportunidad de desafiar a la geometría. Adelante, campeón.');
 }
-function shoot() {
-  if (strikeCue(balls, aim.x, aim.z, Number(powerInput.value) / 100)) {
+function shoot(power = Number(powerInput.value) / 100) {
+  if (strikeCue(balls, aim.x, aim.z, power)) {
     shots++;
     dirtyHUD = true;
     say(['Matthias: Veamos si la física está de tu parte.',
@@ -241,17 +245,43 @@ function shoot() {
       'Matthias: Jawohl. Que las bandas decidan tu destino.'][shots % 4]);
   }
 }
-strikeButton.addEventListener('click', shoot);
+strikeButton.addEventListener('click', () => shoot());
 restartButton.addEventListener('click', restart);
-powerInput.addEventListener('input', () => {
-  powerValue.textContent = powerInput.value + '%';
-  powerInput.style.setProperty('--progress', powerInput.value + '%');
-});
-powerInput.dispatchEvent(new Event('input'));
+function paintPower(value) {
+  const percent = Math.max(0, Math.min(100, Math.round(value)));
+  powerInput.value = String(percent);
+  powerValue.textContent = percent + '%';
+  powerInput.style.setProperty('--progress', percent + '%');
+}
+powerInput.addEventListener('input', () => paintPower(Number(powerInput.value)));
+paintPower(Number(powerInput.value));
+
+function cancelCharge() {
+  charge.cancel();
+  powerInput.classList.remove('charging');
+}
 window.addEventListener('keydown', (event) => {
-  if (event.repeat || event.target === powerInput || event.altKey || event.ctrlKey || event.metaKey) return;
-  if (event.code === 'Space') { event.preventDefault(); shoot(); }
-  if (event.key.toLowerCase() === 'r') restart();
+  if (event.target === powerInput || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.code === 'Space') {
+    event.preventDefault();
+    if (!event.repeat && !ballsMoving(balls) && !balls[0].pocketed) {
+      if (charge.start(performance.now())) powerInput.classList.add('charging');
+    }
+    return;
+  }
+  if (!event.repeat && event.key.toLowerCase() === 'r') restart();
+});
+window.addEventListener('keyup', (event) => {
+  if (event.code !== 'Space' || !charge.active) return;
+  event.preventDefault();
+  const power = charge.release(performance.now());
+  powerInput.classList.remove('charging');
+  paintPower(power * 100);
+  if (power > 0) shoot(power);
+});
+window.addEventListener('blur', cancelCharge);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) cancelCharge();
 });
 
 const ray = new THREE.Raycaster();
@@ -299,27 +329,44 @@ function updateCue() {
   guide.computeLineDistances();
 }
 
+// Fit the *actual projected tabletop*, not an arbitrary camera distance. The
+// viewport excludes the header and controls, so no useful space is wasted.
+const tableCorners = [];
+for (const x of [-4.75, 4.75]) {
+  for (const y of [-0.12, 0.28]) {
+    for (const z of [-2.51, 2.51]) tableCorners.push(new THREE.Vector3(x, y, z));
+  }
+}
+const projectedCorner = new THREE.Vector3();
 function resize() {
   const rect = viewport.getBoundingClientRect();
   const width = Math.max(1, rect.width), height = Math.max(1, rect.height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
-  const verticalTan = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
-  const horizontalTan = verticalTan * camera.aspect;
-  if (height > width * 1.3 && width <= 700) {
-    // Rotate screen-up, not the table: long axis fills a portrait phone.
-    const distance = Math.max(19.5, 5.8 / verticalTan, 2.9 / Math.max(0.07, horizontalTan));
-    camera.up.set(1, 0, 0);
-    camera.position.set(0, distance * 0.87, distance * 0.50);
-    camera.lookAt(-0.75, -0.05, 0);
-  } else {
-    const distance = Math.max(11.5, 5.4 / Math.max(0.07, horizontalTan));
-    camera.up.set(0, 1, 0);
-    camera.position.set(-0.5, distance * 0.78, distance * 0.72);
-    camera.lookAt(0, -0.05, 0);
-  }
+  const portrait = width <= 700 && height > width * 1.15;
+  camera.up.set(portrait ? 1 : 0, portrait ? 0 : 1, 0);
   camera.updateProjectionMatrix();
+  const target = new THREE.Vector3(0, -0.04, 0);
+  const direction = portrait
+    ? new THREE.Vector3(0, 0.87, 0.50).normalize()
+    : new THREE.Vector3(-0.06, 0.77, 0.72).normalize();
+  function fits(distance) {
+    camera.position.copy(direction).multiplyScalar(distance).add(target);
+    camera.lookAt(target);
+    camera.updateMatrixWorld();
+    return tableCorners.every((corner) => {
+      projectedCorner.copy(corner).project(camera);
+      return Math.abs(projectedCorner.x) < 0.91 && Math.abs(projectedCorner.y) < 0.88;
+    });
+  }
+  let near = 4, far = 60;
+  for (let i = 0; i < 24; i++) {
+    const mid = (near + far) / 2;
+    if (fits(mid)) far = mid;
+    else near = mid;
+  }
+  fits(far);
 }
 new ResizeObserver(resize).observe(viewport);
 resize();
@@ -328,6 +375,7 @@ let lastFrame = performance.now();
 let accumulator = 0;
 const FIXED_DT = 1 / 120;
 function frame(now) {
+  if (charge.active) paintPower(charge.sample(now) * 100);
   const elapsed = Math.min((now - lastFrame) / 1000, 0.05);
   lastFrame = now;
   accumulator += elapsed;
