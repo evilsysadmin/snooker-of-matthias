@@ -11,6 +11,8 @@ export const TABLE = Object.freeze({
   pocketRadius: 0.175,
   middlePocketRadius: 0.195,
   cushionRestitution: 0.82,
+  jawRestitution: 0.72,
+  jawRadius: 0.060,
   ballRestitution: 0.94,
   rollingDeceleration: 1.55,
   // Bounded cloth traction for cue follow/draw (not a rigid-body spin solver).
@@ -24,6 +26,24 @@ export const POCKETS = Object.freeze([
   [-4.33, -2.15, TABLE.pocketRadius], [0, -2.18, TABLE.middlePocketRadius], [4.33, -2.15, TABLE.pocketRadius],
   [-4.33, 2.15, TABLE.pocketRadius], [0, 2.18, TABLE.middlePocketRadius], [4.33, 2.15, TABLE.pocketRadius],
 ]);
+
+// Rounded cushion tips at the entrance to every pocket. Both the render and
+// the fixed-step solver consume these same immutable centres/radii. They are a
+// restrained 2D jaw approximation, not an official WPBSA pocket template.
+export const POCKET_JAWS = Object.freeze(POCKETS.flatMap(([px, pz]) => {
+  const sz = Math.sign(pz);
+  const r = TABLE.jawRadius;
+  if (px === 0) {
+    return [-1, 1].map((sx) => Object.freeze({
+      x: sx * 0.25, z: sz * (TABLE.halfZ - 0.045), radius: r,
+    }));
+  }
+  const sx = Math.sign(px);
+  return [
+    Object.freeze({ x: sx * (TABLE.halfX - 0.23), z: sz * (TABLE.halfZ - 0.045), radius: r }),
+    Object.freeze({ x: sx * (TABLE.halfX - 0.05), z: sz * (TABLE.halfZ - 0.23), radius: r }),
+  ];
+}));
 
 // The cloth markings and opening rack use the same physical spots.
 // White marks are cosmetic only; coloured-ball respotting is not yet implemented.
@@ -101,9 +121,30 @@ export function stepPhysics(balls, dt) {
     b.x += b.vx * dt;
     b.z += b.vz * dt;
 
-    // Pocket capture happens *before* cushion response; cushion segments around
-    // the pocket openings are intentionally absent.
+    // Legitimate pocket entries are captured before a jaw could reject them.
     if (capturePocket(b, events)) continue;
+
+    // Pocket shoulders are real, rounded cushions: a grazing shot loses its
+    // inward velocity component instead of disappearing into a circular hole.
+    for (const jaw of POCKET_JAWS) {
+      const dx = b.x - jaw.x, dz = b.z - jaw.z;
+      const minDistance = r + jaw.radius;
+      const distanceSquared = dx * dx + dz * dz;
+      if (distanceSquared >= minDistance * minDistance) continue;
+      const distance = Math.sqrt(distanceSquared);
+      // At a coincident centre, push inward from the closest table edge.
+      const nx = distance > 1e-9 ? dx / distance :
+        (Math.abs(jaw.x) > t.halfX / 2 ? -Math.sign(jaw.x) : 0);
+      const nz = distance > 1e-9 ? dz / distance :
+        (Math.abs(jaw.x) > t.halfX / 2 ? 0 : -Math.sign(jaw.z));
+      b.x = jaw.x + nx * minDistance;
+      b.z = jaw.z + nz * minDistance;
+      const normalVelocity = b.vx * nx + b.vz * nz;
+      if (normalVelocity < 0) {
+        b.vx -= (1 + t.jawRestitution) * normalVelocity * nx;
+        b.vz -= (1 + t.jawRestitution) * normalVelocity * nz;
+      }
+    }
 
     const maxX = t.halfX - r;
     const maxZ = t.halfZ - r;
