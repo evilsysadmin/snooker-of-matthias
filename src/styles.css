@@ -72,8 +72,9 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   .scoreboard strong small { font-size: 9px; }
   .score-divider { height: 23px; }
   .table-label { display: none; }
-  .camera-switch { top: 78px; right: 12px; padding: 3px; border-radius: 10px; }
-  .camera-option { min-width: 65px; min-height: 38px; padding: 0 9px; font-size: 11px; }
+  /* Keep the switch in the gap under the brand, off the top pocket. */
+  .camera-switch { top: 57px; left: 12px; right: auto; padding: 2px; border-radius: 10px; }
+  .camera-option { min-width: 65px; min-height: 40px; padding: 0 9px; font-size: 11px; }
   .bottom-panel { bottom: max(9px, env(safe-area-inset-bottom)); padding: 13px 14px 10px; width: calc(100% - 18px); border-radius: 15px; }
   .monogram { width: 35px; height: 35px; flex-basis: 35px; font-size: 21px; }
   .commentary { margin-bottom: 12px; gap: 9px; }
