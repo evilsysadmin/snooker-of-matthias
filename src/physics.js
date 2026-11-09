@@ -36,12 +36,19 @@ export const POCKET_JAWS = Object.freeze(POCKETS.flatMap(([px, pz]) => {
   if (px === 0) {
     return [-1, 1].map((sx) => Object.freeze({
       x: sx * 0.25, z: sz * (TABLE.halfZ - 0.045), radius: r,
+      railX: sx * 0.355, railZ: sz * (TABLE.halfZ - 0.005),
     }));
   }
   const sx = Math.sign(px);
   return [
-    Object.freeze({ x: sx * (TABLE.halfX - 0.23), z: sz * (TABLE.halfZ - 0.045), radius: r }),
-    Object.freeze({ x: sx * (TABLE.halfX - 0.05), z: sz * (TABLE.halfZ - 0.23), radius: r }),
+    Object.freeze({
+      x: sx * (TABLE.halfX - 0.23), z: sz * (TABLE.halfZ - 0.045), radius: r,
+      railX: sx * 4.225, railZ: sz * (TABLE.halfZ - 0.005),
+    }),
+    Object.freeze({
+      x: sx * (TABLE.halfX - 0.05), z: sz * (TABLE.halfZ - 0.23), radius: r,
+      railX: sx * TABLE.halfX, railZ: sz * 1.815,
+    }),
   ];
 }));
 
