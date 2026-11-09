@@ -79,7 +79,7 @@ try {
       const halfWorldHeight = portrait ? 4.75 : 2.51;
       const halfHeight = Math.max(halfWorldHeight / 0.89, halfWorldWidth / (aspect * 0.89));
       const scale = rect.height / (2 * halfHeight);
-      const brownX = -2.30, brownZ = 0;
+      const brownX = -2.55, brownZ = 0;
       return portrait
         ? { x: rect.left + rect.width / 2 + brownZ * scale,
             y: rect.top + rect.height / 2 - brownX * scale }
