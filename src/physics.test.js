@@ -1,14 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  TABLE, createRack, ballsMoving, stepPhysics, strikeCue, respawnCue,
+  TABLE, OBJECT_BALL_COUNT, createRack, ballsMoving, stepPhysics, strikeCue, respawnCue,
 } from './physics.js';
 
-test('rack has one cue and fifteen unique, initially non-overlapping object balls', () => {
+test('snooker practice rack has 15 reds, 6 colours and one cue, without overlapping', () => {
   const balls = createRack();
-  assert.equal(balls.length, 16);
+  assert.equal(OBJECT_BALL_COUNT, 21);
+  assert.equal(balls.length, OBJECT_BALL_COUNT + 1);
   assert.deepEqual([...balls.map((b) => b.id)].sort((a, b) => a - b),
-    Array.from({ length: 16 }, (_, i) => i));
+    Array.from({ length: OBJECT_BALL_COUNT + 1 }, (_, i) => i));
+  assert.equal(balls.filter((b) => b.id >= 1 && b.id <= 15).length, 15);
+  assert.deepEqual(balls.filter((b) => b.id >= 16).map((b) => b.id), [16, 17, 18, 19, 20, 21]);
+  assert.equal(balls.find((b) => b.id === 19).x, 0, 'blue is centred');
+  assert.ok(balls.find((b) => b.id === 20).x < balls.find((b) => b.id === 1).x,
+    'pink stands before red triangle');
+  assert.ok(balls.find((b) => b.id === 21).x > balls.find((b) => b.id === 15).x,
+    'black stands behind the red triangle');
   for (let i = 0; i < balls.length; i++) {
     for (let j = i + 1; j < balls.length; j++) {
       assert.ok(Math.hypot(balls[i].x - balls[j].x, balls[i].z - balls[j].z)
@@ -28,7 +36,7 @@ test('a shot moves the cue, cannot be fired twice while rolling, and stops with 
 
 test('a head-on collision transfers momentum rather than ghosting through', () => {
   const balls = [
-    { id: 0, x: -0.3, z: 0, vx: 4, vz: 0, pocketed: false },
+    { id: 0, x: -(TABLE.ballRadius * 2 + 0.01), z: 0, vx: 4, vz: 0, pocketed: false },
     { id: 1, x: 0, z: 0, vx: 0, vz: 0, pocketed: false },
   ];
   stepPhysics(balls, 1 / 120);
@@ -47,7 +55,7 @@ test('corner pockets swallow objects and the cue ball without a wall rebound', (
 });
 
 test('cushions reflect away from pockets', () => {
-  const balls = [{ id: 0, x: 4.19, z: 0.4, vx: 3, vz: 0, pocketed: false }];
+  const balls = [{ id: 0, x: TABLE.halfX - TABLE.ballRadius - 0.01, z: 0.4, vx: 3, vz: 0, pocketed: false }];
   stepPhysics(balls, 1 / 120);
   assert.ok(balls[0].vx < 0);
   assert.equal(balls[0].pocketed, false);

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  TABLE, POCKETS, createRack, strikeCue, stepPhysics, ballsMoving, respawnCue,
+  TABLE, POCKETS, OBJECT_BALL_COUNT, createRack, strikeCue, stepPhysics, ballsMoving, respawnCue,
 } from './physics.js';
 import './styles.css';
 import { createShotCharge } from './shotCharge.js';
@@ -16,10 +16,10 @@ app.innerHTML = [
     '<div class="scoreboard" aria-live="polite">',
       '<div><span>TIROS</span><strong id="shots">00</strong></div>',
       '<div class="score-divider"></div>',
-      '<div><span>EMBOCADAS</span><strong id="potted">00 <small>/ 15</small></strong></div>',
+      '<div><span>EMBOCADAS</span><strong id="potted">00 <small>/ ' + OBJECT_BALL_COUNT + '</small></strong></div>',
     '</div>',
   '</header>',
-  '<div class="table-label"><span class="table-label-dot"></span> MESA DE PRÁCTICAS · 3D ALPHA</div>',
+  '<div class="table-label"><span class="table-label-dot"></span> SNOOKER · PRÁCTICA LIBRE · 3D ALPHA</div>',
   '<section class="bottom-panel" aria-label="Controles de billar">',
     '<div class="commentary"><div class="monogram">M</div><div>',
     '<small>MATTHIAS · CRÍTICO DE PRECISIÓN</small>',
@@ -131,29 +131,11 @@ for (const x of [-3.72, 3.72]) for (const z of [-1.64, 1.64]) {
 }
 
 const ballGeo = new THREE.SphereGeometry(TABLE.ballRadius, 32, 24);
+// White, 15 reds, then yellow, green, brown, blue, pink and black.
 const colors = [
-  0xfaf9ed, 0xf6d541, 0x225bd0, 0xd52d34, 0x713eaa, 0xeb811f,
-  0x236a38, 0x891d20, 0x111214, 0xf6d541, 0x225bd0, 0xd52d34,
-  0x713eaa, 0xeb811f, 0x236a38, 0x891d20,
+  0xfaf9ed, ...Array(15).fill(0xb11e2e),
+  0xf1d02d, 0x237342, 0x86502d, 0x244cb2, 0xf0a0b2, 0x15191b,
 ];
-function numberTexture(number) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d');
-  ctx.beginPath();
-  ctx.arc(64, 64, 50, 0, 2 * Math.PI);
-  ctx.fillStyle = '#faf8ef';
-  ctx.fill();
-  ctx.fillStyle = '#172420';
-  ctx.font = 'bold 58px Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(String(number), 64, 68);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
 function ballModel(number) {
   const group = new THREE.Group();
   const base = new THREE.Mesh(ballGeo, new THREE.MeshPhysicalMaterial({
@@ -162,28 +144,12 @@ function ballModel(number) {
   base.castShadow = true;
   base.receiveShadow = true;
   group.add(base);
-  if (number >= 9) {
-    const stripe = new THREE.Mesh(
-      new THREE.SphereGeometry(TABLE.ballRadius * 1.006, 32, 12,
-        0, Math.PI * 2, Math.PI * 0.37, Math.PI * 0.26),
-      new THREE.MeshStandardMaterial({ color: 0xf8f6e9, roughness: 0.19 }),
-    );
-    group.add(stripe);
-  }
-  if (number > 0) {
-    const label = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: numberTexture(number), transparent: true, depthTest: false,
-    }));
-    label.scale.set(0.19, 0.19, 1);
-    label.position.y = TABLE.ballRadius * 0.72;
-    group.add(label);
-  }
   scene.add(group);
   return group;
 }
 
 const models = new Map();
-for (let number = 0; number <= 15; number++) models.set(number, ballModel(number));
+for (let number = 0; number <= OBJECT_BALL_COUNT; number++) models.set(number, ballModel(number));
 
 const aim = new THREE.Vector3(1, 0, 0);
 const cueMaterial = new THREE.MeshStandardMaterial({ color: 0xd7a465, roughness: 0.42 });
@@ -222,7 +188,7 @@ let dirtyHUD = true;
 function say(message) { commentary.textContent = message; }
 function formatScore() {
   shotDisplay.textContent = String(shots).padStart(2, '0');
-  pocketDisplay.innerHTML = String(potted).padStart(2, '0') + ' <small>/ 15</small>';
+  pocketDisplay.innerHTML = String(potted).padStart(2, '0') + ' <small>/ ' + OBJECT_BALL_COUNT + '</small>';
 }
 function restart() {
   charge.cancel();
@@ -319,8 +285,10 @@ function updateCue() {
   cueStick.visible = available;
   guide.visible = available;
   if (!available) return;
-  const offset = 1.86 + (Number(powerInput.value) / 100) * 0.20;
-  cueStick.position.set(cue.x - aim.x * offset, 0.30, cue.z - aim.z * offset);
+  // Put the actual tip just behind the white, with a small power-dependent draw-back.
+  // 1.34 is the tip's local x coordinate inside the cue-stick model.
+  const offset = 1.34 + TABLE.ballRadius + 0.04 + (Number(powerInput.value) / 100) * 0.15;
+  cueStick.position.set(cue.x - aim.x * offset, TABLE.ballRadius + 0.07, cue.z - aim.z * offset);
   cueDirection.copy(aim);
   cueStick.rotation.y = -Math.atan2(aim.z, aim.x);
   const front = new THREE.Vector3(cue.x + aim.x * 0.20, 0.095, cue.z + aim.z * 0.20);
@@ -396,7 +364,7 @@ function frame(now) {
   }
   if (!ballsMoving(balls)) {
     if (scratchPending && respawnCue(balls)) scratchPending = false;
-    if (wasMoving && !scratchPending && potted === 15) {
+    if (wasMoving && !scratchPending && potted === OBJECT_BALL_COUNT) {
       say('Matthias: Todas dentro. Me veo obligado, muy a mi pesar, a felicitarte.');
     }
   }
