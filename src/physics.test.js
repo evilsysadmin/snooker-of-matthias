@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  TABLE, BAULK, COLOUR_SPOTS, OBJECT_BALL_COUNT, createRack, ballsMoving, stepPhysics, strikeCue, respawnCue,
+  TABLE, BAULK, COLOUR_SPOTS, POCKETS, OBJECT_BALL_COUNT, createRack, ballsMoving, stepPhysics, strikeCue, respawnCue,
 } from './physics.js';
 
 test('snooker practice rack has 15 reds, 6 colours and one cue, without overlapping', () => {
@@ -58,12 +58,73 @@ test('a head-on collision transfers momentum rather than ghosting through', () =
 
 test('corner pockets swallow objects and the cue ball without a wall rebound', () => {
   const balls = [
-    { id: 0, x: -4.16, z: 2.05, vx: -0.5, vz: 0, pocketed: false },
-    { id: 1, x: 4.18, z: -2.04, vx: 0, vz: 0, pocketed: false },
+    { id: 0, x: -4.23, z: 2.07, vx: -0.5, vz: 0, pocketed: false },
+    { id: 1, x: 4.23, z: -2.07, vx: 0, vz: 0, pocketed: false },
   ];
   const events = stepPhysics(balls, 1 / 120);
   assert.deepEqual(events.map((e) => e.type).sort(), ['potted', 'scratch']);
   assert.ok(balls.every((b) => b.pocketed));
+});
+
+
+test('ball, baulk and D proportions track snooker scale but keep mobile-readable balls', () => {
+  // WPBSA table: 3569 x 1778 mm; 52.5 mm balls; baulk 737 mm; D radius 292 mm.
+  const visualBallRatio = (2 * TABLE.ballRadius / (2 * TABLE.halfZ)) / (52.5 / 1778);
+  assert.ok(visualBallRatio > 1 && visualBallRatio < 1.25,
+    'balls stay modestly larger than regulation for mobile, not pool-sized');
+  const expectedBaulk = -TABLE.halfX + 2 * TABLE.halfX * 737 / 3569;
+  assert.ok(Math.abs(BAULK.x - expectedBaulk) < 0.03);
+  assert.ok(Math.abs(BAULK.radius - 2 * TABLE.halfZ * 292 / 1778) < 0.03);
+  const balls = createRack();
+  const apex = balls.find((b) => b.id === 1);
+  const pink = balls.find((b) => b.id === 20);
+  assert.ok(apex.x > pink.x);
+  assert.ok(Math.abs((apex.x - pink.x) - (2 * TABLE.ballRadius + 0.008)) < 1e-9,
+    'red triangle moves with ball size, never floats far behind pink');
+});
+
+test('corner and middle pocket physics use the same mouths rendered in 3D', () => {
+  assert.equal(POCKETS.length, 6);
+  for (const [x, z, radius] of POCKETS) {
+    assert.ok(Math.abs(x) > 4 || x === 0);
+    assert.ok(Math.abs(z) >= TABLE.halfZ);
+    assert.equal(radius, x === 0 ? TABLE.middlePocketRadius : TABLE.pocketRadius);
+    assert.ok(radius < 3 * TABLE.ballRadius,
+      'mouth must not swallow balls from an implausibly large distance');
+  }
+  assert.ok(TABLE.middlePocketRadius > TABLE.pocketRadius);
+});
+
+test('straight middle-pocket approaches pot while off-centre grazes bounce off cushion', () => {
+  for (const sign of [-1, 1]) {
+    const centered = [{
+      id: 1, x: 0, z: sign * 1.98, vx: 0, vz: sign * 3, pocketed: false,
+    }];
+    const events = stepPhysics(centered, 1 / 120);
+    assert.deepEqual(events.map((event) => event.type), ['potted']);
+    assert.equal(centered[0].pocketed, true);
+    assert.equal(centered[0].vz, 0);
+
+    const grazing = [{
+      id: 1, x: 0.24, z: sign * 1.9, vx: 0, vz: sign * 3, pocketed: false,
+    }];
+    let potted = 0;
+    for (let i = 0; i < 45; i++) {
+      potted += stepPhysics(grazing, 1 / 120).filter((event) => event.type === 'potted').length;
+    }
+    assert.equal(potted, 0, 'ball outside the actual mouth should not disappear');
+    assert.equal(grazing[0].pocketed, false);
+    assert.ok(grazing[0].vz * sign < 0, 'near miss must really bounce back');
+  }
+});
+
+test('glancing corner approach misses the now tighter pocket and reflects', () => {
+  const ball = { id: 1, x: 4.15, z: 1.9, vx: 3, vz: 0, pocketed: false };
+  const events = [];
+  for (let i = 0; i < 40; i++) events.push(...stepPhysics([ball], 1 / 120));
+  assert.deepEqual(events, []);
+  assert.equal(ball.pocketed, false);
+  assert.ok(ball.vx < 0, 'missed corner pockets are played from the cushion');
 });
 
 test('cushions reflect away from pockets', () => {
