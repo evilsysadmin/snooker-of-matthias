@@ -20,6 +20,10 @@ app.innerHTML = [
     '</div>',
   '</header>',
   '<div class="table-label"><span class="table-label-dot"></span> SNOOKER · PRÁCTICA LIBRE · 3D ALPHA</div>',
+  '<div class="camera-switch" role="group" aria-label="Vista de cámara">',
+    '<button id="camera-top" class="camera-option" type="button" aria-pressed="true">Cenital</button>',
+    '<button id="camera-3d" class="camera-option" type="button" aria-pressed="false">3D</button>',
+  '</div>',
   '<section class="bottom-panel" aria-label="Controles de billar">',
     '<div class="commentary"><div class="monogram">M</div><div>',
     '<small>MATTHIAS · CRÍTICO DE PRECISIÓN</small>',
@@ -45,12 +49,17 @@ const strikeButton = document.querySelector('#strike');
 const restartButton = document.querySelector('#restart');
 const powerInput = document.querySelector('#power');
 const powerValue = document.querySelector('#power-value');
+const topCameraButton = document.querySelector('#camera-top');
+const perspectiveCameraButton = document.querySelector('#camera-3d');
 const charge = createShotCharge();
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#071316');
-scene.fog = new THREE.FogExp2('#071316', 0.026);
-const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+const perspectiveFog = new THREE.FogExp2('#071316', 0.026);
+const perspectiveCamera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+const topCamera = new THREE.OrthographicCamera(-5, 5, 5, -5, 0.1, 100);
+let camera = topCamera;
+scene.fog = null;
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -227,7 +236,9 @@ function cancelCharge() {
   powerInput.classList.remove('charging');
 }
 window.addEventListener('keydown', (event) => {
-  if (event.target === powerInput || event.altKey || event.ctrlKey || event.metaKey) return;
+  // Keep native Space activation for focused buttons/sliders (including camera controls).
+  if (event.target instanceof HTMLButtonElement || event.target instanceof HTMLInputElement ||
+      event.altKey || event.ctrlKey || event.metaKey) return;
   if (event.code === 'Space') {
     event.preventDefault();
     if (!event.repeat && !ballsMoving(balls) && !balls[0].pocketed) {
@@ -297,8 +308,8 @@ function updateCue() {
   guide.computeLineDistances();
 }
 
-// Fit the *actual projected tabletop*, not an arbitrary camera distance. The
-// viewport excludes the header and controls, so no useful space is wasted.
+// Each camera fits the tabletop within the clear viewport, excluding the HUD.
+ // The orthographic view makes aiming distances visually consistent.
 const tableCorners = [];
 for (const x of [-4.75, 4.75]) {
   for (const y of [-0.12, 0.28]) {
@@ -311,20 +322,38 @@ function resize() {
   const width = Math.max(1, rect.width), height = Math.max(1, rect.height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(width, height, false);
-  camera.aspect = width / height;
+  const aspect = width / height;
   const portrait = width <= 700 && height > width * 1.15;
-  camera.up.set(portrait ? 1 : 0, portrait ? 0 : 1, 0);
-  camera.updateProjectionMatrix();
+
+  // Desktop: baulk to the left. Portrait: turn the tabletop lengthwise.
+  // Orthographic scaling is determined by *both* axes and the available viewport.
+  const halfWorldWidth = portrait ? 2.51 : 4.75;
+  const halfWorldHeight = portrait ? 4.75 : 2.51;
+  const halfHeight = Math.max(halfWorldHeight / 0.89, halfWorldWidth / (aspect * 0.89));
+  topCamera.left = -halfHeight * aspect;
+  topCamera.right = halfHeight * aspect;
+  topCamera.top = halfHeight;
+  topCamera.bottom = -halfHeight;
+  topCamera.up.set(portrait ? 1 : 0, 0, portrait ? 0 : -1);
+  topCamera.position.set(0, 20, 0);
+  topCamera.lookAt(0, 0, 0);
+  topCamera.updateProjectionMatrix();
+  topCamera.updateMatrixWorld();
+
+  // Keep the existing cinema-style perspective fitting for the 3D option.
+  perspectiveCamera.aspect = aspect;
+  perspectiveCamera.up.set(portrait ? 1 : 0, portrait ? 0 : 1, 0);
+  perspectiveCamera.updateProjectionMatrix();
   const target = new THREE.Vector3(0, -0.04, 0);
   const direction = portrait
     ? new THREE.Vector3(0, 0.87, 0.50).normalize()
     : new THREE.Vector3(-0.06, 0.77, 0.72).normalize();
   function fits(distance) {
-    camera.position.copy(direction).multiplyScalar(distance).add(target);
-    camera.lookAt(target);
-    camera.updateMatrixWorld();
+    perspectiveCamera.position.copy(direction).multiplyScalar(distance).add(target);
+    perspectiveCamera.lookAt(target);
+    perspectiveCamera.updateMatrixWorld();
     return tableCorners.every((corner) => {
-      projectedCorner.copy(corner).project(camera);
+      projectedCorner.copy(corner).project(perspectiveCamera);
       return Math.abs(projectedCorner.x) < 0.91 && Math.abs(projectedCorner.y) < 0.88;
     });
   }
@@ -336,8 +365,18 @@ function resize() {
   }
   fits(far);
 }
+function setCameraMode(mode) {
+  camera = mode === '3d' ? perspectiveCamera : topCamera;
+  scene.fog = mode === '3d' ? perspectiveFog : null;
+  viewport.dataset.camera = mode;
+  topCameraButton.setAttribute('aria-pressed', String(mode === 'top'));
+  perspectiveCameraButton.setAttribute('aria-pressed', String(mode === '3d'));
+}
+topCameraButton.addEventListener('click', () => setCameraMode('top'));
+perspectiveCameraButton.addEventListener('click', () => setCameraMode('3d'));
 new ResizeObserver(resize).observe(viewport);
 resize();
+setCameraMode('top');
 
 let lastFrame = performance.now();
 let accumulator = 0;

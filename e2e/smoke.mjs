@@ -29,20 +29,59 @@ try {
     assert.ok(dimensions.w >= 350 && dimensions.h >= 500, '3D canvas should have dimensions');
     assert.equal(await page.locator('#shots').innerText(), '00');
     assert.match(await page.locator('#potted').innerText(), /\/ 21/, 'snooker counts 21 object balls');
+    assert.equal(await page.locator('#viewport').getAttribute('data-camera'), 'top');
+    assert.equal(await page.locator('#camera-top').getAttribute('aria-pressed'), 'true');
     const layout = await page.evaluate(() => {
       const rect = (query) => document.querySelector(query).getBoundingClientRect();
-      return { viewport: rect('#viewport'), header: rect('.topbar'), controls: rect('.bottom-panel') };
+      return {
+        viewport: rect('#viewport'), header: rect('.topbar'),
+        brand: rect('.brand'), scoreboard: rect('.scoreboard'),
+        controls: rect('.bottom-panel'), switcher: rect('.camera-switch'),
+        pageWidth: document.documentElement.scrollWidth,
+        windowWidth: window.innerWidth,
+      };
     });
     assert.ok(layout.viewport.top >= layout.header.bottom - 1, 'table viewport clears header');
     assert.ok(layout.viewport.bottom <= layout.controls.top + 1, 'table viewport clears controls');
+    const overlaps = (a, b) =>
+      a.left < b.right - 1 && a.right > b.left + 1 &&
+      a.top < b.bottom - 1 && a.bottom > b.top + 1;
+    assert.ok(!overlaps(layout.switcher, layout.brand), 'camera switch clears brand');
+    assert.ok(!overlaps(layout.switcher, layout.scoreboard), 'camera switch clears scoreboard');
+    assert.ok(layout.switcher.bottom < layout.controls.top, 'camera switch clears controls');
+    if (config.isMobile) {
+      assert.ok(layout.switcher.bottom <= layout.viewport.top + 35,
+        'mobile camera selector stays above the upper tabletop cushion');
+    }
+    assert.ok(layout.pageWidth <= layout.windowWidth + 1, 'no horizontal scrolling');
     await page.screenshot({
-      path: 'artifacts/snooker-' + config.name + '.png', fullPage: true,
+      path: 'artifacts/snooker-' + config.name + '-top.png', fullPage: true,
       animations: 'disabled',
     });
+    await page.locator('#camera-3d').click();
+    assert.equal(await page.locator('#viewport').getAttribute('data-camera'), '3d');
+    assert.equal(await page.locator('#camera-3d').getAttribute('aria-pressed'), 'true');
+    await page.screenshot({
+      path: 'artifacts/snooker-' + config.name + '-3d.png', fullPage: true,
+      animations: 'disabled',
+    });
+    await page.locator('#camera-top').click();
+    assert.equal(await page.locator('#viewport').getAttribute('data-camera'), 'top');
+    // A focused camera button should accept Space without firing a shot.
+    await page.locator('#camera-3d').focus();
+    await page.keyboard.press('Space');
+    assert.equal(await page.locator('#viewport').getAttribute('data-camera'), '3d');
+    assert.equal(await page.locator('#shots').innerText(), '00');
+    await page.locator('#camera-top').click();
     await page.locator('#strike').click();
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
+    await page.locator('#camera-3d').click();
+    assert.equal(await page.locator('#shots').innerText(), '01', 'camera switch preserves live game');
+    await page.locator('#camera-top').click();
     await page.locator('#restart').click();
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');
+    // Blur the reset button so Space exercises gameplay charge, not native button activation.
+    await page.evaluate(() => document.activeElement?.blur());
     await page.keyboard.down('Space');
     await page.waitForFunction(() => Number(document.querySelector('#power')?.value) >= 35);
     await page.keyboard.up('Space');

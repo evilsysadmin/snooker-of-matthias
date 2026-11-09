@@ -15,7 +15,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #e4c987; outline-
 #viewport { position: absolute; inset: 130px 0 205px; }
 #viewport canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
 .vignette { position: absolute; inset: 0; pointer-events: none; z-index: 1; background: linear-gradient(180deg, rgba(2,11,13,.78) 0%, transparent 23%, transparent 64%, rgba(2,11,13,.85) 100%); }
-.topbar, .bottom-panel, .table-label { position: absolute; z-index: 3; }
+.topbar, .bottom-panel, .table-label, .camera-switch { position: absolute; z-index: 3; }
 .topbar { left: clamp(16px, 3.8vw, 56px); top: clamp(19px, 3.4vw, 46px); right: clamp(16px, 3.8vw, 56px); display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
 .brand { display: flex; align-items: center; gap: 15px; }
 .brand-icon { display: grid; place-items: center; width: 46px; height: 46px; border: 1px solid rgba(216,182,114,.52); border-radius: 50%; color: #e0bb7b; font-size: 25px; background: #142425a3; }
@@ -31,6 +31,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid #e4c987; outline-
 .score-divider { height: 35px; width: 1px; background: #d0edcc26; }
 .table-label { top: 18.5%; left: 50%; transform: translateX(-50%); display: flex; white-space: nowrap; align-items: center; gap: 9px; padding: 8px 14px; border: 1px solid #d8e9d124; background: #091d1ed6; border-radius: 99px; color: #aebfb3; font-size: 9px; }
 .table-label-dot { width: 6px; height: 6px; background: #8fd6b4; border-radius: 50%; box-shadow: 0 0 8px #8fd6b488; }
+.camera-switch { top: 143px; right: clamp(16px, 3.8vw, 56px); display: flex; gap: 3px; padding: 4px; background: #091d1ede; border: 1px solid #d8e9d12e; border-radius: 12px; backdrop-filter: blur(12px); }
+.camera-option { min-width: 70px; min-height: 36px; padding: 0 12px; border-radius: 8px; background: transparent; color: #b4c8bc; font-size: 12px; font-weight: 700; }
+.camera-option[aria-pressed="true"] { background: #e1c388; color: #142320; }
+.camera-option:hover:not([aria-pressed="true"]) { background: #244039; color: #fff1d5; }
 .bottom-panel { width: min(770px, calc(100% - 32px)); left: 50%; transform: translateX(-50%); bottom: max(22px, env(safe-area-inset-bottom)); padding: 18px 24px 14px; border: 1px solid #c9d6bc30; border-radius: 20px; background: linear-gradient(125deg, #152725ed, #0c1b1cea); box-shadow: 0 18px 85px #0008, inset 0 1px #ffffff12; backdrop-filter: blur(20px); }
 .commentary { display: flex; align-items: center; gap: 13px; margin-bottom: 16px; }
 .monogram { width: 44px; height: 44px; flex: 0 0 44px; display: grid; place-items: center; border-radius: 12px; border: 1px solid #e2c68e4a; background: #9e7c3b24; color: #f0d59b; font: 800 25px/1 Georgia,serif; }
@@ -68,6 +72,9 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   .scoreboard strong small { font-size: 9px; }
   .score-divider { height: 23px; }
   .table-label { display: none; }
+  /* Keep the switch in the gap under the brand, off the top pocket. */
+  .camera-switch { top: 57px; left: 12px; right: auto; padding: 2px; border-radius: 10px; }
+  .camera-option { min-width: 65px; min-height: 40px; padding: 0 9px; font-size: 11px; }
   .bottom-panel { bottom: max(9px, env(safe-area-inset-bottom)); padding: 13px 14px 10px; width: calc(100% - 18px); border-radius: 15px; }
   .monogram { width: 35px; height: 35px; flex-basis: 35px; font-size: 21px; }
   .commentary { margin-bottom: 12px; gap: 9px; }
@@ -83,6 +90,7 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
 @media (max-height: 580px) {
   #viewport { top: 58px; bottom: 150px; }
   .table-label { display: none; }
+  .camera-switch { top: 64px; }
   .bottom-panel { padding-top: 9px; padding-bottom: 9px; }
   .commentary { margin-bottom: 8px; }
   .hint { display: none; }
