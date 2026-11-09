@@ -200,7 +200,7 @@ test('spin is bounded, neutral is identical to legacy and nonfinite spin is igno
 
 test('cue spin cannot survive a scratch or be applied to respawned white', () => {
   const balls = [
-    { id: 0, x: 4.18, z: 2.05, vx: 0, vz: 0, spinVx: 2, spinVz: 1, pocketed: false },
+    { id: 0, x: 4.23, z: 2.08, vx: 0, vz: 0, spinVx: 2, spinVz: 1, pocketed: false },
   ];
   const events = stepPhysics(balls, 1 / 120);
   assert.equal(events[0].type, 'scratch');
