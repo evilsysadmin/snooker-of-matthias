@@ -55,7 +55,7 @@ test('corner pockets swallow objects and the cue ball without a wall rebound', (
 });
 
 test('cushions reflect away from pockets', () => {
-  const balls = [{ id: 0, x: 4.19, z: 0.4, vx: 3, vz: 0, pocketed: false }];
+  const balls = [{ id: 0, x: TABLE.halfX - TABLE.ballRadius - 0.01, z: 0.4, vx: 3, vz: 0, pocketed: false }];
   stepPhysics(balls, 1 / 120);
   assert.ok(balls[0].vx < 0);
   assert.equal(balls[0].pocketed, false);
