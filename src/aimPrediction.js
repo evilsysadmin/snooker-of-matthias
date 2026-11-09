@@ -29,8 +29,10 @@ export function predictFirstContact(balls, dx, dz) {
     const projection = px * ux + pz * uz;
     if (projection < 0) continue;
     const closestSquared = Math.max(0, px * px + pz * pz - projection * projection);
-    if (closestSquared > diameterSquared) continue;
-    const travel = Math.max(0, projection - Math.sqrt(diameterSquared - closestSquared));
+    // Account for floating-point rounding at exact tangency without
+    // widening the actual ball radius by a visually meaningful amount.
+    if (closestSquared > diameterSquared + 1e-12) continue;
+    const travel = Math.max(0, projection - Math.sqrt(Math.max(0, diameterSquared - closestSquared)));
     if (travel < distance - 1e-9) {
       distance = travel;
       ballId = ball.id;
