@@ -1,14 +1,14 @@
 # 🎱 Snooker of Matthias
 
-A deliberately small but **playable 3D billiards** experiment for the ShadowOps family. No physics-engine Kubernetes cluster (yet).
+A deliberately small but **playable 3D snooker** experiment for the ShadowOps family. No physics-engine Kubernetes cluster (yet).
 
 ## First POC
 
-- Real 3D table, rails, pockets, cue and 16 balls.
+- Real 3D table, rails, pockets, cue and 22 snooker balls: 15 reds, six coloured balls and the white.
 - Aim by moving/dragging on the table; choose power and strike via button or Space.
 - Fixed-step deterministic collision, cushions, friction, pocket capture, white-ball scratch/respawn.
 - Shot and pocket counters, reset, mobile-friendly interface and occasional Matthias snark.
-- **Free practice only**: no official snooker, 8-ball turn rules, AI, spin/English or multiplayer yet.
+- **Free practice only**: authentic snooker layout and colours, but no official snooker turn/scoring/respotted-colour rules, AI, spin/English or multiplayer yet.
 
 ## Local development
 
