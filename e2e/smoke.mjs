@@ -58,6 +58,12 @@ try {
     });
     await page.locator('#camera-top').click();
     assert.equal(await page.locator('#viewport').getAttribute('data-camera'), 'top');
+    // A focused camera button should accept Space without firing a shot.
+    await page.locator('#camera-3d').focus();
+    await page.keyboard.press('Space');
+    assert.equal(await page.locator('#viewport').getAttribute('data-camera'), '3d');
+    assert.equal(await page.locator('#shots').innerText(), '00');
+    await page.locator('#camera-top').click();
     await page.locator('#strike').click();
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
     await page.locator('#camera-3d').click();
@@ -65,6 +71,8 @@ try {
     await page.locator('#camera-top').click();
     await page.locator('#restart').click();
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');
+    // Blur the reset button so Space exercises gameplay charge, not native button activation.
+    await page.evaluate(() => document.activeElement?.blur());
     await page.keyboard.down('Space');
     await page.waitForFunction(() => Number(document.querySelector('#power')?.value) >= 35);
     await page.keyboard.up('Space');
