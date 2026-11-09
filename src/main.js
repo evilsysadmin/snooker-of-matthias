@@ -39,7 +39,7 @@ app.innerHTML = [
       '<button id="strike" class="strike" type="button" aria-label="Golpear: toca para usar la potencia elegida, mantén pulsado para cargar" title="Toca para golpear · mantén pulsado para cargar"><span>⚡</span> GOLPEAR <kbd>ESPACIO</kbd></button>',
       '<button id="restart" class="restart" type="button" title="Recolocar las bolas" aria-label="Reiniciar partida">↺</button>',
     '</div>',
-    '<p class="hint">Apunta sobre la mesa. Toca GOLPEAR para usar la potencia marcada, o mantén pulsado y suelta para cargar el taco (también ESPACIO). R reinicia.</p>',
+    '<p class="hint">Apunta en la mesa. Toca GOLPEAR o mantén para cargar; suelta para tirar. ESPACIO también carga. R reinicia.</p>',
     '<div class="fine-aim" role="group" aria-label="Ajuste fino de puntería">',
       '<button id="fine-left" class="fine-step" type="button" aria-label="Girar puntería 0,5 grados a la izquierda">↶ <span>0,5°</span></button>',
       '<div class="fine-status"><small>AJUSTE FINO</small><output id="fine-angle" aria-live="polite">0,0°</output></div>',
