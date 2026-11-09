@@ -4,6 +4,7 @@ import {
 } from './physics.js';
 import './styles.css';
 import { createShotCharge } from './shotCharge.js';
+import { predictFirstContact } from './aimPrediction.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -35,7 +36,7 @@ app.innerHTML = [
       '<button id="strike" class="strike" type="button"><span>⚡</span> GOLPEAR <kbd>ESPACIO</kbd></button>',
       '<button id="restart" class="restart" type="button" title="Recolocar las bolas" aria-label="Reiniciar partida">↺</button>',
     '</div>',
-    '<p class="hint">Apunta con ratón o dedo. Mantén ESPACIO para cargar: sube y baja; suelta para golpear. R reinicia.</p>',
+    '<p class="hint">Apunta con ratón o dedo: la guía marca el primer contacto. Mantén ESPACIO para cargar; suelta para golpear. R reinicia.</p>',
   '</section>',
   '<div class="vignette" aria-hidden="true"></div>',
   '</main>',
@@ -232,6 +233,25 @@ const guide = new THREE.Line(
   new THREE.LineDashedMaterial({ color: 0xd4f6d9, dashSize: 0.13, gapSize: 0.12, transparent: true, opacity: 0.6 }),
 );
 scene.add(guide);
+// A translucent ghost-white ring marks the predicted cue-ball position at
+// first contact; a small gold dot marks the actual surface contact on cut shots.
+const ghostRing = new THREE.Mesh(
+  new THREE.TorusGeometry(TABLE.ballRadius, 0.009, 7, 40),
+  new THREE.MeshBasicMaterial({
+    color: 0xeef8e8, transparent: true, opacity: 0.82, depthWrite: false, depthTest: false,
+  }),
+);
+ghostRing.rotation.x = -Math.PI / 2;
+ghostRing.renderOrder = 3;
+ghostRing.visible = false;
+scene.add(ghostRing);
+const impactDot = new THREE.Mesh(
+  new THREE.SphereGeometry(0.023, 12, 8),
+  new THREE.MeshBasicMaterial({ color: 0xf1c778, depthWrite: false, depthTest: false }),
+);
+impactDot.renderOrder = 4;
+impactDot.visible = false;
+scene.add(impactDot);
 const cueDirection = new THREE.Vector3(1, 0, 0);
 
 let balls = createRack();
@@ -343,6 +363,9 @@ function updateCue() {
   const available = !cue.pocketed && !ballsMoving(balls);
   cueStick.visible = available;
   guide.visible = available;
+  ghostRing.visible = false;
+  impactDot.visible = false;
+  viewport.dataset.aimTarget = '';
   if (!available) return;
   // Put the actual tip just behind the white, with a small power-dependent draw-back.
   // 1.34 is the tip's local x coordinate inside the cue-stick model.
@@ -350,10 +373,24 @@ function updateCue() {
   cueStick.position.set(cue.x - aim.x * offset, TABLE.ballRadius + 0.052, cue.z - aim.z * offset);
   cueDirection.copy(aim);
   cueStick.rotation.y = -Math.atan2(aim.z, aim.x);
-  const front = new THREE.Vector3(cue.x + aim.x * 0.20, 0.095, cue.z + aim.z * 0.20);
-  const end = new THREE.Vector3(cue.x + aim.x * 5.0, 0.095, cue.z + aim.z * 5.0);
+  const preview = predictFirstContact(balls, aim.x, aim.z);
+  if (!preview) { guide.visible = false; return; }
+  const start = Math.min(preview.distance, TABLE.ballRadius * 1.2);
+  const front = new THREE.Vector3(cue.x + aim.x * start, 0.095, cue.z + aim.z * start);
+  const end = new THREE.Vector3(preview.x, 0.095, preview.z);
   guide.geometry.setFromPoints([front, end]);
   guide.computeLineDistances();
+  if (preview.ballId !== null) {
+    const target = balls.find((ball) => ball.id === preview.ballId);
+    ghostRing.position.set(preview.x, 0.102, preview.z);
+    ghostRing.visible = true;
+    // The contact lies halfway between the centres of two equal-radius balls,
+    // not necessarily on the aim axis when playing a cut.
+    impactDot.position.set((preview.x + target.x) / 2, TABLE.ballRadius + 0.057,
+      (preview.z + target.z) / 2);
+    impactDot.visible = true;
+    viewport.dataset.aimTarget = String(preview.ballId);
+  }
 }
 
 // Each camera fits the tabletop within the clear viewport, excluding the HUD.
