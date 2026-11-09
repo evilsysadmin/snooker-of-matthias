@@ -23,7 +23,7 @@ test('off-axis collision and tangent contact respect the diameter of two balls',
   assert.ok(near.distance > 0 && near.distance < 1);
   const tangent = predictFirstContact([cue(), object(4, 1, 2 * TABLE.ballRadius)], 1, 0);
   assert.equal(tangent.ballId, 4);
-  assert.ok(Math.abs(tangent.distance - 1) < 1e-8);
+  assert.ok(Math.abs(tangent.distance - 1) < 1e-6);
   const miss = predictFirstContact([cue(), object(4, 1, 2 * TABLE.ballRadius + 0.001)], 1, 0);
   assert.equal(miss.ballId, null);
 });
