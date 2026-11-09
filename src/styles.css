@@ -91,7 +91,7 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   .restart { min-width: 38px; min-height: 43px; }
   .hint { display: none; }
   .fine-aim { display: flex; align-items: center; justify-content: space-between; gap: 9px; margin-top: 8px; }
-  .fine-step { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; min-width: 88px; padding: 0 12px; border-radius: 10px; border: 1px solid #b3ccac33; background: #2b4841; color: #f1e4cb; font-size: 19px; font-weight: 700; touch-action: manipulation; }
+  .fine-step { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; min-width: 88px; padding: 0 12px; border-radius: 10px; border: 1px solid #b3ccac33; background: #2b4841; color: #f1e4cb; font-size: 19px; font-weight: 700; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .fine-step span { font-size: 11px; font-variant-numeric: tabular-nums; }
   .fine-status { display: grid; gap: 2px; justify-items: center; min-width: 90px; }
   .fine-status small { color: #afc0b3; font-size: 9px; font-weight: 800; letter-spacing: .12em; white-space: nowrap; }
