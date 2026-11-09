@@ -18,6 +18,18 @@ export const POCKETS = Object.freeze([
   [-4.33, 2.15], [0, 2.18], [4.33, 2.15],
 ]);
 
+// The cloth markings and opening rack use the same physical spots.
+// White marks are cosmetic only; coloured-ball respotting is not yet implemented.
+export const BAULK = Object.freeze({ x: -2.30, radius: 0.93 });
+export const COLOUR_SPOTS = Object.freeze([
+  Object.freeze({ id: 16, x: BAULK.x, z: BAULK.radius }),  // Yellow
+  Object.freeze({ id: 17, x: BAULK.x, z: -BAULK.radius }), // Green
+  Object.freeze({ id: 18, x: BAULK.x, z: 0 }),             // Brown
+  Object.freeze({ id: 19, x: 0, z: 0 }),                   // Blue
+  Object.freeze({ id: 20, x: 1.23, z: 0 }),                // Pink
+  Object.freeze({ id: 21, x: 3.36, z: 0 }),                // Black
+]);
+
 export function createRack() {
   const r = TABLE.ballRadius;
   const gap = 2 * r + 0.008;
@@ -40,15 +52,7 @@ export function createRack() {
 
   // Baulk colours, blue centre, pink in front of the reds and black behind.
   // These are practice-ball identities; scoring/respots are not yet official rules.
-  const spots = [
-    [16, -2.30, 0.93],  // Yellow
-    [17, -2.30, -0.93], // Green
-    [18, -2.30, 0],     // Brown
-    [19, 0, 0],         // Blue
-    [20, 1.23, 0],      // Pink
-    [21, 3.36, 0],      // Black
-  ];
-  for (const [id, x, z] of spots) {
+  for (const { id, x, z } of COLOUR_SPOTS) {
     balls.push({ id, number: id, x, z, vx: 0, vz: 0, pocketed: false });
   }
   return balls;

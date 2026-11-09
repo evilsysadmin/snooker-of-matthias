@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  TABLE, OBJECT_BALL_COUNT, createRack, ballsMoving, stepPhysics, strikeCue, respawnCue,
+  TABLE, BAULK, COLOUR_SPOTS, OBJECT_BALL_COUNT, createRack, ballsMoving, stepPhysics, strikeCue, respawnCue,
 } from './physics.js';
 
 test('snooker practice rack has 15 reds, 6 colours and one cue, without overlapping', () => {
@@ -12,6 +12,18 @@ test('snooker practice rack has 15 reds, 6 colours and one cue, without overlapp
     Array.from({ length: OBJECT_BALL_COUNT + 1 }, (_, i) => i));
   assert.equal(balls.filter((b) => b.id >= 1 && b.id <= 15).length, 15);
   assert.deepEqual(balls.filter((b) => b.id >= 16).map((b) => b.id), [16, 17, 18, 19, 20, 21]);
+  assert.equal(COLOUR_SPOTS.length, 6);
+  for (const spot of COLOUR_SPOTS) {
+    const ball = balls.find((b) => b.id === spot.id);
+    assert.ok(ball, `missing colour ${spot.id}`);
+    assert.equal(ball.x, spot.x, `colour ${spot.id} x`);
+    assert.equal(ball.z, spot.z, `colour ${spot.id} z`);
+  }
+  assert.ok(BAULK.x < 0 && BAULK.x > -TABLE.halfX, 'baulk line lies inside table');
+  assert.ok(BAULK.radius > 0 && BAULK.radius < TABLE.halfZ, 'D fits inside cushion');
+  assert.equal(COLOUR_SPOTS[0].z, BAULK.radius);
+  assert.equal(COLOUR_SPOTS[1].z, -BAULK.radius);
+  assert.equal(COLOUR_SPOTS[2].x, BAULK.x);
   assert.equal(balls.find((b) => b.id === 19).x, 0, 'blue is centred');
   assert.ok(balls.find((b) => b.id === 20).x < balls.find((b) => b.id === 1).x,
     'pink stands before red triangle');
