@@ -285,8 +285,10 @@ function updateCue() {
   cueStick.visible = available;
   guide.visible = available;
   if (!available) return;
-  const offset = 1.86 + (Number(powerInput.value) / 100) * 0.20;
-  cueStick.position.set(cue.x - aim.x * offset, 0.30, cue.z - aim.z * offset);
+  // Put the actual tip just behind the white, with a small power-dependent draw-back.
+  // 1.34 is the tip's local x coordinate inside the cue-stick model.
+  const offset = 1.34 + TABLE.ballRadius + 0.04 + (Number(powerInput.value) / 100) * 0.15;
+  cueStick.position.set(cue.x - aim.x * offset, TABLE.ballRadius + 0.07, cue.z - aim.z * offset);
   cueDirection.copy(aim);
   cueStick.rotation.y = -Math.atan2(aim.z, aim.x);
   const front = new THREE.Vector3(cue.x + aim.x * 0.20, 0.095, cue.z + aim.z * 0.20);
