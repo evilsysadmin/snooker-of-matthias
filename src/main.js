@@ -164,14 +164,27 @@ for (const [x, z, radius] of POCKETS) {
   scene.add(lip);
 }
 
-// Soft felt-covered pocket shoulders use exactly the physics jaw locations.
+// Soft felt-covered shoulders join the existing cushion noses rather than
+// looking like detached green spheres. Their collision tips are the exact
+// radii/centres exported by the deterministic physics model.
 const jawGeometry = new THREE.SphereGeometry(TABLE.jawRadius, 20, 12);
+const jawBridgeGeometry = new THREE.SphereGeometry(1, 16, 10);
 for (const jaw of POCKET_JAWS) {
-  const mesh = new THREE.Mesh(jawGeometry, noseFelt);
-  mesh.position.set(jaw.x, TABLE.ballRadius + 0.052, jaw.z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  scene.add(mesh);
+  const dx = jaw.railX - jaw.x, dz = jaw.railZ - jaw.z;
+  const length = Math.hypot(dx, dz);
+  const bridge = new THREE.Mesh(jawBridgeGeometry, noseFelt);
+  bridge.position.set((jaw.x + jaw.railX) / 2, 0.135, (jaw.z + jaw.railZ) / 2);
+  bridge.scale.set(length / 2 + 0.045, 0.023, 0.045);
+  bridge.rotation.y = -Math.atan2(dz, dx);
+  bridge.receiveShadow = true;
+  scene.add(bridge);
+
+  const tip = new THREE.Mesh(jawGeometry, noseFelt);
+  tip.scale.y = 0.4; // Rounded cushion profile, not another snooker-sized ball.
+  tip.position.set(jaw.x, 0.135, jaw.z);
+  tip.castShadow = true;
+  tip.receiveShadow = true;
+  scene.add(tip);
 }
 
 // Authentic, subtle baulk line, D arc and colour spots. All sit above the cloth
