@@ -236,7 +236,9 @@ function cancelCharge() {
   powerInput.classList.remove('charging');
 }
 window.addEventListener('keydown', (event) => {
-  if (event.target === powerInput || event.altKey || event.ctrlKey || event.metaKey) return;
+  // Keep native Space activation for focused buttons/sliders (including camera controls).
+  if (event.target instanceof HTMLButtonElement || event.target instanceof HTMLInputElement ||
+      event.altKey || event.ctrlKey || event.metaKey) return;
   if (event.code === 'Space') {
     event.preventDefault();
     if (!event.repeat && !ballsMoving(balls) && !balls[0].pocketed) {
