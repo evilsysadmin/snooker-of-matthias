@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  TABLE, POCKETS, BAULK, COLOUR_SPOTS, OBJECT_BALL_COUNT, createRack, strikeCue, stepPhysics, ballsMoving, respawnCue,
+  TABLE, POCKETS, POCKET_JAWS, BAULK, COLOUR_SPOTS, OBJECT_BALL_COUNT, createRack, strikeCue, stepPhysics, ballsMoving, respawnCue,
 } from './physics.js';
 import './styles.css';
 import { createShotCharge } from './shotCharge.js';
@@ -162,6 +162,16 @@ for (const [x, z, radius] of POCKETS) {
   lip.rotation.x = -Math.PI / 2;
   lip.position.set(x, 0.066, z);
   scene.add(lip);
+}
+
+// Soft felt-covered pocket shoulders use exactly the physics jaw locations.
+const jawGeometry = new THREE.SphereGeometry(TABLE.jawRadius, 20, 12);
+for (const jaw of POCKET_JAWS) {
+  const mesh = new THREE.Mesh(jawGeometry, noseFelt);
+  mesh.position.set(jaw.x, TABLE.ballRadius + 0.052, jaw.z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
 }
 
 // Authentic, subtle baulk line, D arc and colour spots. All sit above the cloth
@@ -467,6 +477,7 @@ function updateCue(now) {
   ghostRing.visible = false;
   impactDot.visible = false;
   viewport.dataset.aimTarget = '';
+  viewport.dataset.aimJaw = '';
   // Animate a short, bounded cue-tip strike before hiding the stick during roll.
   // Only the illustration animates: actual physics starts immediately on release.
   if (strokeAnimation) {
@@ -514,6 +525,11 @@ function updateCue(now) {
       (preview.z + target.z) / 2);
     impactDot.visible = true;
     viewport.dataset.aimTarget = String(preview.ballId);
+  } else if (preview.jawIndex !== null) {
+    // Show a tiny amber mark where the white will first graze the felt jaw.
+    impactDot.position.set(preview.x, TABLE.ballRadius + 0.052, preview.z);
+    impactDot.visible = true;
+    viewport.dataset.aimJaw = String(preview.jawIndex);
   }
 }
 
