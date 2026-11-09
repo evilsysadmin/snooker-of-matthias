@@ -148,15 +148,15 @@ for (const side of [-1, 1]) {
   shortNose.receiveShadow = true;
   scene.add(shortNose);
 }
-for (const [x, z] of POCKETS) {
-  const hole = new THREE.Mesh(new THREE.CircleGeometry(TABLE.pocketRadius, 48), pocketMaterial);
+for (const [x, z, radius] of POCKETS) {
+  const hole = new THREE.Mesh(new THREE.CircleGeometry(radius, 48), pocketMaterial);
   hole.rotation.x = -Math.PI / 2;
   hole.position.set(x, 0.06, z);
   scene.add(hole);
   // A dark, softly rounded leather mouth reads as a recessed pocket.
   // Avoid the bright complete metal hoops of the original pool-style prototype.
   const lip = new THREE.Mesh(
-    new THREE.TorusGeometry(TABLE.pocketRadius + 0.005, 0.030, 10, 48),
+    new THREE.TorusGeometry(radius + 0.005, 0.030, 10, 48),
     pocketLeather,
   );
   lip.rotation.x = -Math.PI / 2;
