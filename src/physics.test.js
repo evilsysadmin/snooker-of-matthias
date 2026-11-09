@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  TABLE, BAULK, COLOUR_SPOTS, POCKETS, OBJECT_BALL_COUNT, createRack, ballsMoving, stepPhysics, strikeCue, respawnCue,
+  TABLE, BAULK, COLOUR_SPOTS, POCKETS, POCKET_JAWS, OBJECT_BALL_COUNT, createRack, ballsMoving, stepPhysics, strikeCue, respawnCue,
 } from './physics.js';
 
 test('snooker practice rack has 15 reds, 6 colours and one cue, without overlapping', () => {
@@ -125,6 +125,71 @@ test('glancing corner approach misses the now tighter pocket and reflects', () =
   assert.deepEqual(events, []);
   assert.equal(ball.pocketed, false);
   assert.ok(ball.vx < 0, 'missed corner pockets are played from the cushion');
+});
+
+test('every pocket has two mirrored rounded jaws inside the playable table', () => {
+  assert.equal(POCKET_JAWS.length, POCKETS.length * 2);
+  for (const jaw of POCKET_JAWS) {
+    assert.equal(jaw.radius, TABLE.jawRadius);
+    assert.ok(Math.abs(jaw.x) < TABLE.halfX);
+    assert.ok(Math.abs(jaw.z) < TABLE.halfZ);
+    assert.ok(POCKET_JAWS.some((other) =>
+      Math.abs(other.x + jaw.x) < 1e-9 && Math.abs(other.z + jaw.z) < 1e-9),
+    'shoulders must be mirror-symmetric at all pockets');
+  }
+});
+
+test('a grazing shot at each middle-pocket shoulder is really rejected', () => {
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const jaw = POCKET_JAWS.find((item) =>
+      Math.sign(item.x) === sx && Math.sign(item.z) === sz && Math.abs(item.x) < 1);
+    assert.ok(jaw);
+    const ball = {
+      id: 1, x: jaw.x - sx * 0.03,
+      z: jaw.z - sz * (TABLE.ballRadius + jaw.radius + 0.01),
+      vx: 0, vz: sz * 3, pocketed: false,
+    };
+    const events = stepPhysics([ball], 1 / 120);
+    assert.deepEqual(events, []);
+    assert.equal(ball.pocketed, false);
+    assert.ok(ball.vz * sz < 0, 'the jaw must reflect the incoming ball');
+  }
+});
+
+test('the two kinds of corner jaw reject glancing shots without swallowing balls', () => {
+  for (const signX of [-1, 1]) for (const signZ of [-1, 1]) {
+    const jaws = POCKET_JAWS.filter((jaw) =>
+      Math.sign(jaw.x) === signX && Math.sign(jaw.z) === signZ && Math.abs(jaw.x) > 3);
+    assert.equal(jaws.length, 2);
+    const longRailJaw = jaws.find((jaw) => Math.abs(jaw.x) < TABLE.halfX - 0.1);
+    const shortRailJaw = jaws.find((jaw) => Math.abs(jaw.x) > TABLE.halfX - 0.1);
+    assert.ok(longRailJaw && shortRailJaw);
+    const towardsLong = [{
+      id: 1, x: longRailJaw.x,
+      z: longRailJaw.z - signZ * (TABLE.ballRadius + longRailJaw.radius + 0.01),
+      vx: 0, vz: signZ * 3, pocketed: false,
+    }];
+    assert.deepEqual(stepPhysics(towardsLong, 1 / 120), []);
+    assert.ok(towardsLong[0].vz * signZ < 0);
+    const towardsShort = [{
+      id: 1, x: shortRailJaw.x - signX * (TABLE.ballRadius + shortRailJaw.radius + 0.01),
+      z: shortRailJaw.z, vx: signX * 3, vz: 0, pocketed: false,
+    }];
+    assert.deepEqual(stepPhysics(towardsShort, 1 / 120), []);
+    assert.ok(towardsShort[0].vx * signX < 0);
+  }
+});
+
+test('a centered middle-pocket ball is never blocked by the new jaw geometry', () => {
+  for (const side of [-1, 1]) {
+    const ball = { id: 1, x: 0, z: side * 1.88, vx: 0, vz: side * 3, pocketed: false };
+    const events = [];
+    for (let i = 0; i < 20 && !ball.pocketed; i++) {
+      events.push(...stepPhysics([ball], 1 / 120));
+    }
+    assert.deepEqual(events.map((event) => event.type), ['potted']);
+    assert.equal(ball.pocketed, true);
+  }
 });
 
 test('cushions reflect away from pockets', () => {
