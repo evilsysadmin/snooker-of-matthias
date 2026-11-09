@@ -54,6 +54,21 @@ try {
         'mobile camera selector stays above the upper tabletop cushion');
     }
     assert.ok(layout.pageWidth <= layout.windowWidth + 1, 'no horizontal scrolling');
+    const spinControl = page.locator('#spin-cycle');
+    assert.equal(await spinControl.getAttribute('data-spin'), '0', 'default shot uses centre hit');
+    const selectSpin = async () => {
+      if (config.isMobile) await spinControl.tap();
+      else await spinControl.click();
+    };
+    await selectSpin();
+    assert.equal(await spinControl.getAttribute('data-spin'), '1', 'follow selectable');
+    await selectSpin();
+    assert.equal(await spinControl.getAttribute('data-spin'), '-1', 'draw selectable');
+    await selectSpin();
+    assert.equal(await spinControl.getAttribute('data-spin'), '0', 'centre selectable again');
+    await selectSpin();
+    assert.equal(await spinControl.getAttribute('data-spin'), '1');
+    assert.equal(await page.locator('#shots').innerText(), '00', 'spin choice never fires a shot');
     // Point at the brown spot from the opening cue position. Project known
     // world coordinates through the same orthographic framing in both sizes.
     const brownScreen = await page.locator('#viewport canvas').evaluate((canvas) => {
@@ -114,6 +129,7 @@ try {
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
     await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '',
       undefined, { timeout: 5000 });
+    assert.equal(await spinControl.isDisabled(), true, 'cannot change spin while the balls roll');
     if (config.isMobile) assert.equal(await page.locator('#fine-right').isDisabled(), true,
       'fine aim is disabled while balls move');
     await page.locator('#camera-3d').click();
@@ -121,6 +137,7 @@ try {
     await page.locator('#camera-top').click();
     await page.locator('#restart').click();
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');
+    assert.equal(await spinControl.getAttribute('data-spin'), '0', 'restart resets spin');
     if (config.isMobile) assert.equal(await page.locator('#fine-angle').innerText(), '0,0°',
       'restart resets the fine-aim adjustment');
     // Blur the reset button so Space exercises gameplay charge, not native button activation.

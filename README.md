@@ -8,9 +8,10 @@ A deliberately small but **playable 3D snooker** experiment for the ShadowOps fa
 - Play with the default true overhead (orthographic) camera or switch instantly to the cinematic 3D camera using **Cenital / 3D**; both use the same table, balls and shot state.
 - Aim by moving/dragging on the table in either camera; the guide stops at the first ball (ghost-white ring and contact point) or cushion, without predicting spin or rebounds.
 - On narrow/mobile screens use the **↶ / ↷ 0,5°** fine-aim buttons below shot power for sub-degree corrections; tapping the table resets the displayed correction baseline. Choose power and strike via button or Space.
+- The compact **● Centro → ↑ Sigue → ↓ Retro** button cycles cue-ball strike effects. Follow/draw change actual cue motion via a deterministic, bounded cloth-traction approximation after contact; not a full angular-velocity model. The first-contact aiming guide does not predict post-impact spin paths.
 - Fixed-step deterministic collision, cushions, friction, pocket capture, white-ball scratch/respawn.
 - Shot and pocket counters, reset, mobile-friendly interface and occasional Matthias snark.
-- **Free practice only**: authentic snooker layout and colours, but no official snooker turn/scoring/respotted-colour rules, AI, spin/English or multiplayer yet.
+- **Free practice only**: authentic snooker layout and colours, but no official snooker turn/scoring/respotted-colour rules, AI, **side spin (English)** or multiplayer yet. Follow/draw is an initial simplified simulation, not a calibrated real-world snooker model.
 
 ## Local development
 

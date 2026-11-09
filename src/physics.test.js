@@ -95,3 +95,57 @@ test('zero charge does not produce a shot or move the cue', () => {
   assert.equal(balls[0].vx, 0);
   assert.equal(ballsMoving(balls), false);
 });
+
+test('follow and draw visibly change the real white-ball motion after a head-on collision', () => {
+  function play(followDraw) {
+    const balls = [
+      { id: 0, x: -0.8, z: 0, vx: 0, vz: 0, pocketed: false },
+      { id: 1, x: 0, z: 0, vx: 0, vz: 0, pocketed: false },
+    ];
+    assert.equal(strikeCue(balls, 1, 0, 0.4, followDraw), true);
+    for (let i = 0; i < 55; i++) stepPhysics(balls, 1 / 120);
+    return balls;
+  }
+  const normal = play(0);
+  const follow = play(1);
+  const draw = play(-1);
+  assert.ok(follow[0].vx > normal[0].vx + 0.35, 'topspin sends the white forward after contact');
+  assert.ok(draw[0].vx < normal[0].vx - 0.35, 'backspin pulls the white backward after contact');
+  assert.ok(draw[0].vx < 0, 'a draw shot actually reverses cue direction');
+  for (const result of [normal, follow, draw]) {
+    assert.ok(result.every((b) => Number.isFinite(b.x) && Number.isFinite(b.vx)));
+    assert.ok(result[1].vx > 0, 'the object ball still receives the head-on strike');
+  }
+});
+
+test('spin is bounded, neutral is identical to legacy and nonfinite spin is ignored', () => {
+  const make = () => [
+    { id: 0, x: -0.8, z: 0, vx: 0, vz: 0, pocketed: false },
+    { id: 1, x: 0, z: 0, vx: 0, vz: 0, pocketed: false },
+  ];
+  const neutral = make(), omitted = make(), invalid = make(), bounded = make(), explicit = make();
+  assert.ok(strikeCue(neutral, 1, 0, .4, 0));
+  assert.ok(strikeCue(omitted, 1, 0, .4));
+  assert.ok(strikeCue(invalid, 1, 0, .4, NaN));
+  assert.ok(strikeCue(bounded, 1, 0, .4, 1000));
+  assert.ok(strikeCue(explicit, 1, 0, .4, 1));
+  for (let i = 0; i < 70; i++) {
+    for (const set of [neutral, omitted, invalid, bounded, explicit]) stepPhysics(set, 1 / 120);
+  }
+  assert.deepEqual(neutral, omitted, 'default neutral remains backward-compatible');
+  assert.deepEqual(neutral, invalid, 'non-finite spin must be safely neutral');
+  assert.deepEqual(bounded, explicit, 'large input spin is clamped');
+});
+
+test('cue spin cannot survive a scratch or be applied to respawned white', () => {
+  const balls = [
+    { id: 0, x: 4.18, z: 2.05, vx: 0, vz: 0, spinVx: 2, spinVz: 1, pocketed: false },
+  ];
+  const events = stepPhysics(balls, 1 / 120);
+  assert.equal(events[0].type, 'scratch');
+  assert.equal(balls[0].spinVx, 0);
+  assert.equal(balls[0].spinVz, 0);
+  assert.equal(respawnCue(balls), true);
+  assert.equal(balls[0].spinVx, 0);
+  assert.equal(balls[0].spinVz, 0);
+});
