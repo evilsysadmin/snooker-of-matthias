@@ -417,7 +417,7 @@ window.addEventListener('keydown', (event) => {
   if (!event.repeat && event.key.toLowerCase() === 'r') restart();
 });
 window.addEventListener('keyup', (event) => {
-  if (event.code !== 'Space' || !charge.active) return;
+  if (event.code !== 'Space' || !charge.active || pointerStroke) return;
   event.preventDefault();
   const power = charge.release(performance.now());
   powerInput.classList.remove('charging');
