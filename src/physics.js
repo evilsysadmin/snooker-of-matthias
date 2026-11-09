@@ -3,12 +3,15 @@
 export const TABLE = Object.freeze({
   halfX: 4.35,
   halfZ: 2.15,
-  ballRadius: 0.145,
+  ballRadius: 0.105,
   pocketRadius: 0.31,
   cushionRestitution: 0.82,
   ballRestitution: 0.94,
   rollingDeceleration: 1.55,
 });
+
+// Fifteen reds and six colours, plus the white cue ball. Practice rules remain free-play.
+export const OBJECT_BALL_COUNT = 21;
 
 export const POCKETS = Object.freeze([
   [-4.33, -2.15], [0, -2.18], [4.33, -2.15],
@@ -19,21 +22,34 @@ export function createRack() {
   const r = TABLE.ballRadius;
   const gap = 2 * r + 0.008;
   const balls = [{
-    id: 0, number: 0, x: -2.55, z: 0, vx: 0, vz: 0, pocketed: false,
+    id: 0, number: 0, x: -2.9, z: 0.38, vx: 0, vz: 0, pocketed: false,
   }];
-  // 15 ball triangle. Rules in this alpha are deliberately practice-only.
-  const numbers = [1, 9, 2, 10, 8, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15];
-  let idx = 0;
+
+  // Snooker starts with a five-row pyramid of 15 reds behind the pink spot.
+  let redId = 1;
   for (let row = 0; row < 5; row++) {
     for (let col = 0; col <= row; col++) {
-      const number = numbers[idx++];
       balls.push({
-        id: number, number,
-        x: 1.42 + row * gap * Math.sqrt(3) / 2,
+        id: redId, number: redId++,
+        x: 1.55 + row * gap * Math.sqrt(3) / 2,
         z: (col - row / 2) * gap,
         vx: 0, vz: 0, pocketed: false,
       });
     }
+  }
+
+  // Baulk colours, blue centre, pink in front of the reds and black behind.
+  // These are practice-ball identities; scoring/respots are not yet official rules.
+  const spots = [
+    [16, -2.30, 0.93],  // Yellow
+    [17, -2.30, -0.93], // Green
+    [18, -2.30, 0],     // Brown
+    [19, 0, 0],         // Blue
+    [20, 1.23, 0],      // Pink
+    [21, 3.36, 0],      // Black
+  ];
+  for (const [id, x, z] of spots) {
+    balls.push({ id, number: id, x, z, vx: 0, vz: 0, pocketed: false });
   }
   return balls;
 }
