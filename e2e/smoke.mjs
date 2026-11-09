@@ -73,6 +73,22 @@ try {
     });
     await page.mouse.move(brownScreen.x, brownScreen.y);
     await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '18');
+    if (config.isMobile) {
+      assert.equal(await page.locator('#fine-angle').innerText(), '0,0°');
+      await page.locator('#fine-right').tap();
+      assert.equal(await page.locator('#fine-angle').innerText(), '+0,5°');
+      assert.equal(await page.locator('#shots').innerText(), '00', 'fine aim does not fire');
+      await page.locator('#fine-left').tap();
+      assert.equal(await page.locator('#fine-angle').innerText(), '0,0°');
+      await page.locator('#fine-left').tap();
+      assert.equal(await page.locator('#fine-angle').innerText(), '−0,5°');
+      // A fresh pointer aim is the new baseline. Controls never change the score.
+      await page.mouse.move(brownScreen.x + 1, brownScreen.y);
+      await page.waitForFunction(() => document.querySelector('#fine-angle')?.textContent === '0,0°');
+      await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '18');
+      await page.locator('#fine-right').tap();
+      assert.equal(await page.locator('#fine-angle').innerText(), '+0,5°');
+    }
     await page.screenshot({
       path: 'artifacts/snooker-' + config.name + '-top.png', fullPage: true,
       animations: 'disabled',
@@ -98,11 +114,15 @@ try {
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
     await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '',
       undefined, { timeout: 5000 });
+    if (config.isMobile) assert.equal(await page.locator('#fine-right').isDisabled(), true,
+      'fine aim is disabled while balls move');
     await page.locator('#camera-3d').click();
     assert.equal(await page.locator('#shots').innerText(), '01', 'camera switch preserves live game');
     await page.locator('#camera-top').click();
     await page.locator('#restart').click();
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');
+    if (config.isMobile) assert.equal(await page.locator('#fine-angle').innerText(), '0,0°',
+      'restart resets the fine-aim adjustment');
     // Blur the reset button so Space exercises gameplay charge, not native button activation.
     await page.evaluate(() => document.activeElement?.blur());
     await page.keyboard.down('Space');
