@@ -8,6 +8,8 @@ export const TABLE = Object.freeze({
   cushionRestitution: 0.82,
   ballRestitution: 0.94,
   rollingDeceleration: 1.55,
+  // Bounded cloth traction for cue follow/draw (not a rigid-body spin solver).
+  cueSpinTransferRate: 5.0,
 });
 
 // Fifteen reds and six colours, plus the white cue ball. Practice rules remain free-play.
@@ -62,7 +64,7 @@ export function ballsMoving(balls) {
   return balls.some((b) => !b.pocketed && (b.vx * b.vx + b.vz * b.vz) > 0.0001);
 }
 
-export function strikeCue(balls, dx, dz, power) {
+export function strikeCue(balls, dx, dz, power, followDraw = 0) {
   const cue = balls.find((ball) => ball.id === 0);
   const length = Math.hypot(dx, dz);
   if (!cue || cue.pocketed || ballsMoving(balls) || length < 0.0001) return false;
@@ -71,6 +73,11 @@ export function strikeCue(balls, dx, dz, power) {
   const speed = 2.7 + strength * 8.3;
   cue.vx = dx / length * speed;
   cue.vz = dz / length * speed;
+  // Retained forward/backward rolling motion couples into the cue velocity
+  // progressively via cloth traction. Neutral shots retain legacy physics.
+  const spin = Number.isFinite(followDraw) ? Math.max(-1, Math.min(1, followDraw)) : 0;
+  cue.spinVx = cue.vx * spin * 0.42;
+  cue.spinVz = cue.vz * spin * 0.42;
   return true;
 }
 
@@ -139,6 +146,23 @@ export function stepPhysics(balls, dt) {
     }
   }
   for (const b of balls) if (!b.pocketed) capturePocket(b, events);
+
+  // Simplified cloth traction: top/backspin gradually transfers its remaining
+  // impulse into cue-ball translation, including after collision. No effect on
+  // object balls, and no hidden side spin or invented rebound predictions.
+  const cue = balls.find((b) => b.id === 0);
+  if (cue && !cue.pocketed) {
+    const magnitude = Math.hypot(cue.spinVx || 0, cue.spinVz || 0);
+    if (magnitude > 1e-9) {
+      const transfer = Math.min(magnitude, t.cueSpinTransferRate * dt);
+      const share = transfer / magnitude;
+      const impulseX = cue.spinVx * share, impulseZ = cue.spinVz * share;
+      cue.vx += impulseX;
+      cue.vz += impulseZ;
+      cue.spinVx -= impulseX;
+      cue.spinVz -= impulseZ;
+    }
+  }
   return events;
 }
 
@@ -148,6 +172,7 @@ function capturePocket(ball, events) {
       ball.pocketed = true;
       ball.vx = 0;
       ball.vz = 0;
+      if (ball.id === 0) { ball.spinVx = 0; ball.spinVz = 0; }
       events.push({ type: ball.id === 0 ? "scratch" : "potted", id: ball.id });
       return true;
     }
@@ -163,7 +188,7 @@ export function respawnCue(balls) {
     for (const z of [0, -0.38, 0.38, -0.76, 0.76, -1.14, 1.14]) {
       if (balls.every((b) => b.id === 0 || b.pocketed ||
         Math.hypot(b.x - x, b.z - z) > 2 * TABLE.ballRadius + 0.02)) {
-        Object.assign(cue, { x, z, vx: 0, vz: 0, pocketed: false });
+        Object.assign(cue, { x, z, vx: 0, vz: 0, spinVx: 0, spinVz: 0, pocketed: false });
         return true;
       }
     }
