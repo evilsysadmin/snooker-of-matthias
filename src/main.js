@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  TABLE, POCKETS, BAULK, COLOUR_SPOTS, OBJECT_BALL_COUNT, createRack, strikeCue, stepPhysics, ballsMoving, respawnCue,
+  TABLE, POCKETS, POCKET_JAWS, BAULK, COLOUR_SPOTS, OBJECT_BALL_COUNT, createRack, strikeCue, stepPhysics, ballsMoving, respawnCue,
 } from './physics.js';
 import './styles.css';
 import { createShotCharge } from './shotCharge.js';
@@ -162,6 +162,29 @@ for (const [x, z, radius] of POCKETS) {
   lip.rotation.x = -Math.PI / 2;
   lip.position.set(x, 0.066, z);
   scene.add(lip);
+}
+
+// Soft felt-covered shoulders join the existing cushion noses rather than
+// looking like detached green spheres. Their collision tips are the exact
+// radii/centres exported by the deterministic physics model.
+const jawGeometry = new THREE.SphereGeometry(TABLE.jawRadius, 20, 12);
+const jawBridgeGeometry = new THREE.SphereGeometry(1, 16, 10);
+for (const jaw of POCKET_JAWS) {
+  const dx = jaw.railX - jaw.x, dz = jaw.railZ - jaw.z;
+  const length = Math.hypot(dx, dz);
+  const bridge = new THREE.Mesh(jawBridgeGeometry, noseFelt);
+  bridge.position.set((jaw.x + jaw.railX) / 2, 0.135, (jaw.z + jaw.railZ) / 2);
+  bridge.scale.set(length / 2 + 0.045, 0.023, 0.045);
+  bridge.rotation.y = -Math.atan2(dz, dx);
+  bridge.receiveShadow = true;
+  scene.add(bridge);
+
+  const tip = new THREE.Mesh(jawGeometry, noseFelt);
+  tip.scale.y = 0.4; // Rounded cushion profile, not another snooker-sized ball.
+  tip.position.set(jaw.x, 0.135, jaw.z);
+  tip.castShadow = true;
+  tip.receiveShadow = true;
+  scene.add(tip);
 }
 
 // Authentic, subtle baulk line, D arc and colour spots. All sit above the cloth
@@ -467,6 +490,7 @@ function updateCue(now) {
   ghostRing.visible = false;
   impactDot.visible = false;
   viewport.dataset.aimTarget = '';
+  viewport.dataset.aimJaw = '';
   // Animate a short, bounded cue-tip strike before hiding the stick during roll.
   // Only the illustration animates: actual physics starts immediately on release.
   if (strokeAnimation) {
@@ -514,6 +538,17 @@ function updateCue(now) {
       (preview.z + target.z) / 2);
     impactDot.visible = true;
     viewport.dataset.aimTarget = String(preview.ballId);
+  } else if (preview.jawIndex !== null) {
+    // Show a tiny amber mark where the white will first graze the felt jaw.
+    const jaw = POCKET_JAWS[preview.jawIndex];
+    const share = jaw.radius / (jaw.radius + TABLE.ballRadius);
+    impactDot.position.set(
+      jaw.x + (preview.x - jaw.x) * share,
+      TABLE.ballRadius + 0.052,
+      jaw.z + (preview.z - jaw.z) * share,
+    );
+    impactDot.visible = true;
+    viewport.dataset.aimJaw = String(preview.jawIndex);
   }
 }
 

@@ -1,4 +1,4 @@
-import { TABLE } from './physics.js';
+import { TABLE, POCKET_JAWS } from './physics.js';
 
 // Returns where the white ball's CENTRE first reaches a stationary ball or a
 // cushion when travelling along the chosen direction. Pure geometry only:
@@ -38,5 +38,23 @@ export function predictFirstContact(balls, dx, dz) {
       ballId = ball.id;
     }
   }
-  return { x: cue.x + distance * ux, z: cue.z + distance * uz, distance, ballId };
+  // The first impact can also be a rounded pocket jaw. Keep the aiming guide
+  // honest: stop at contact, never draw a fictitious bounce or pocket trajectory.
+  let jawIndex = null;
+  for (let index = 0; index < POCKET_JAWS.length; index++) {
+    const jaw = POCKET_JAWS[index];
+    const px = jaw.x - cue.x, pz = jaw.z - cue.z;
+    const projection = px * ux + pz * uz;
+    if (projection < 0) continue;
+    const radius = TABLE.ballRadius + jaw.radius;
+    const closestSquared = Math.max(0, px * px + pz * pz - projection * projection);
+    if (closestSquared > radius * radius + 1e-12) continue;
+    const travel = Math.max(0, projection - Math.sqrt(Math.max(0, radius * radius - closestSquared)));
+    if (travel < distance - 1e-9) {
+      distance = travel;
+      ballId = null;
+      jawIndex = index;
+    }
+  }
+  return { x: cue.x + distance * ux, z: cue.z + distance * uz, distance, ballId, jawIndex };
 }
