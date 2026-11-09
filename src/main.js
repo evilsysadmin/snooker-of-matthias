@@ -84,7 +84,9 @@ scene.add(fill);
 const wood = new THREE.MeshStandardMaterial({ color: 0x442a20, roughness: 0.48, metalness: 0.04 });
 const darkWood = new THREE.MeshStandardMaterial({ color: 0x251b17, roughness: 0.44 });
 const brass = new THREE.MeshStandardMaterial({ color: 0xb59b5c, roughness: 0.28, metalness: 0.75 });
-const felt = new THREE.MeshStandardMaterial({ color: 0x126b54, roughness: 0.98 });
+// Matte, aged inlay avoids specular white stripes along one edge under the spotlight.
+const railInlay = new THREE.MeshStandardMaterial({ color: 0x8f774b, roughness: 0.76, metalness: 0.25 });
+const felt = new THREE.MeshStandardMaterial({ color: 0x0c5a41, roughness: 0.98 });
 const cushion = new THREE.MeshStandardMaterial({ color: 0x165943, roughness: 0.95 });
 const pocketMaterial = new THREE.MeshStandardMaterial({ color: 0x030506, roughness: 1, side: THREE.DoubleSide });
 const pocketLeather = new THREE.MeshStandardMaterial({ color: 0x231b17, roughness: 0.92 });
@@ -116,7 +118,7 @@ for (const side of [-1, 1]) {
   for (const half of [-1, 1]) {
     box(4.11, 0.18, 0.22, half * 2.30, 0.135, side * 2.30, wood);
     box(3.87, 0.075, 0.11, half * 2.29, 0.095, side * 2.16, cushion);
-    box(3.83, 0.016, 0.022, half * 2.29, 0.236, side * 2.38, brass);
+    box(3.83, 0.016, 0.022, half * 2.29, 0.236, side * 2.38, railInlay);
     // Round the visible nose of each cushion; the underlying collision wall is unchanged.
     const longNose = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 3.87, 12), noseFelt);
     longNose.rotation.z = Math.PI / 2;
@@ -126,7 +128,7 @@ for (const side of [-1, 1]) {
   }
   box(0.25, 0.18, 3.74, side * 4.51, 0.135, 0, wood);
   box(0.10, 0.075, 3.63, side * 4.37, 0.095, 0, cushion);
-  box(0.025, 0.016, 3.66, side * 4.65, 0.236, 0, brass);
+  box(0.025, 0.016, 3.66, side * 4.65, 0.236, 0, railInlay);
   const shortNose = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 3.63, 12), noseFelt);
   shortNose.rotation.x = Math.PI / 2;
   shortNose.position.set(side * 4.35, 0.135, 0);
