@@ -58,8 +58,12 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
 .restart { min-width: 47px; min-height: 46px; color: #efe3c9; background: #34504a; font-size: 27px; border-radius: 11px; }
 .restart:hover { background: #42645c; }
 .hint { margin: 15px 0 0; color: #91a59a; text-align: center; font-size: 11px; }
+/* Fine controls replace the mobile hint instead of covering any part of the table. */
+.fine-aim { display: none; }
+.fine-step:disabled { opacity: .38; cursor: not-allowed; }
+.fine-step:active:not(:disabled) { background: #e1c388; color: #172722; }
 @media (max-width: 700px) {
-  #viewport { top: 70px; bottom: 195px; }
+  #viewport { top: 70px; bottom: 205px; }
   .topbar { top: max(13px, env(safe-area-inset-top)); left: 13px; right: 13px; gap: 5px; align-items: flex-start; }
   .brand { gap: 8px; }
   .brand-icon { width: 33px; height: 33px; font-size: 18px; }
@@ -85,7 +89,13 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   .strike { padding: 0 12px; min-height: 43px; font-size: 11px; gap: 5px; }
   .strike kbd { display: none; }
   .restart { min-width: 38px; min-height: 43px; }
-  .hint { font-size: 9px; margin-top: 11px; }
+  .hint { display: none; }
+  .fine-aim { display: flex; align-items: center; justify-content: space-between; gap: 9px; margin-top: 8px; }
+  .fine-step { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; min-width: 88px; padding: 0 12px; border-radius: 10px; border: 1px solid #b3ccac33; background: #2b4841; color: #f1e4cb; font-size: 19px; font-weight: 700; touch-action: manipulation; }
+  .fine-step span { font-size: 11px; font-variant-numeric: tabular-nums; }
+  .fine-status { display: grid; gap: 2px; justify-items: center; min-width: 90px; }
+  .fine-status small { color: #afc0b3; font-size: 9px; font-weight: 800; letter-spacing: .12em; white-space: nowrap; }
+  .fine-status output { color: #e1c388; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
 }
 @media (max-height: 580px) {
   #viewport { top: 58px; bottom: 150px; }
