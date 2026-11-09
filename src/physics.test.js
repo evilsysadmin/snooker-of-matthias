@@ -131,6 +131,11 @@ test('every pocket has two mirrored rounded jaws inside the playable table', () 
   assert.equal(POCKET_JAWS.length, POCKETS.length * 2);
   for (const jaw of POCKET_JAWS) {
     assert.equal(jaw.radius, TABLE.jawRadius);
+    assert.ok(Number.isFinite(jaw.railX) && Number.isFinite(jaw.railZ),
+      'visible shoulder must have a physical jaw-to-rail anchor');
+    const joinLength = Math.hypot(jaw.railX - jaw.x, jaw.railZ - jaw.z);
+    assert.ok(joinLength >= 0.08 && joinLength <= 0.17,
+      'rounded shoulders join the existing rail without extended floating pieces');
     assert.ok(Math.abs(jaw.x) < TABLE.halfX);
     assert.ok(Math.abs(jaw.z) < TABLE.halfZ);
     assert.ok(POCKET_JAWS.some((other) =>
