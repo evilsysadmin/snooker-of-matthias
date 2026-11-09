@@ -6,7 +6,8 @@ A deliberately small but **playable 3D snooker** experiment for the ShadowOps fa
 
 - Real 3D table with cloth baulk/D markings, colour spots, rounded cushion noses, dark leather-look pocket mouths, cue and 22 snooker balls: 15 reds, six coloured balls and the white.
 - Play with the default true overhead (orthographic) camera or switch instantly to the cinematic 3D camera using **Cenital / 3D**; both use the same table, balls and shot state.
-- Aim by moving/dragging on the table in either camera; the guide stops at the first ball (ghost-white ring and contact point) or cushion, without predicting spin or rebounds. Choose power and strike via button or Space.
+- Aim by moving/dragging on the table in either camera; the guide stops at the first ball (ghost-white ring and contact point) or cushion, without predicting spin or rebounds.
+- On narrow/mobile screens use the **↶ / ↷ 0,5°** fine-aim buttons below shot power for sub-degree corrections; tapping the table resets the displayed correction baseline. Choose power and strike via button or Space.
 - Fixed-step deterministic collision, cushions, friction, pocket capture, white-ball scratch/respawn.
 - Shot and pocket counters, reset, mobile-friendly interface and occasional Matthias snark.
 - **Free practice only**: authentic snooker layout and colours, but no official snooker turn/scoring/respotted-colour rules, AI, spin/English or multiplayer yet.
