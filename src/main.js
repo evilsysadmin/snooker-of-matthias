@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  TABLE, POCKETS, OBJECT_BALL_COUNT, createRack, strikeCue, stepPhysics, ballsMoving, respawnCue,
+  TABLE, POCKETS, BAULK, COLOUR_SPOTS, OBJECT_BALL_COUNT, createRack, strikeCue, stepPhysics, ballsMoving, respawnCue,
 } from './physics.js';
 import './styles.css';
 import { createShotCharge } from './shotCharge.js';
@@ -86,7 +86,9 @@ const darkWood = new THREE.MeshStandardMaterial({ color: 0x251b17, roughness: 0.
 const brass = new THREE.MeshStandardMaterial({ color: 0xb59b5c, roughness: 0.28, metalness: 0.75 });
 const felt = new THREE.MeshStandardMaterial({ color: 0x126b54, roughness: 0.98 });
 const cushion = new THREE.MeshStandardMaterial({ color: 0x165943, roughness: 0.95 });
-const pocketMaterial = new THREE.MeshStandardMaterial({ color: 0x050708, roughness: 0.8, side: THREE.DoubleSide });
+const pocketMaterial = new THREE.MeshStandardMaterial({ color: 0x030506, roughness: 1, side: THREE.DoubleSide });
+const pocketLeather = new THREE.MeshStandardMaterial({ color: 0x231b17, roughness: 0.92 });
+const noseFelt = new THREE.MeshStandardMaterial({ color: 0x20674e, roughness: 0.97 });
 
 function box(w, h, d, x, y, z, mat, parent = scene) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -115,23 +117,67 @@ for (const side of [-1, 1]) {
     box(4.11, 0.18, 0.22, half * 2.30, 0.135, side * 2.30, wood);
     box(3.87, 0.075, 0.11, half * 2.29, 0.095, side * 2.16, cushion);
     box(3.83, 0.016, 0.022, half * 2.29, 0.236, side * 2.38, brass);
+    // Round the visible nose of each cushion; the underlying collision wall is unchanged.
+    const longNose = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 3.87, 12), noseFelt);
+    longNose.rotation.z = Math.PI / 2;
+    longNose.position.set(half * 2.29, 0.135, side * 2.145);
+    longNose.receiveShadow = true;
+    scene.add(longNose);
   }
   box(0.25, 0.18, 3.74, side * 4.51, 0.135, 0, wood);
   box(0.10, 0.075, 3.63, side * 4.37, 0.095, 0, cushion);
   box(0.025, 0.016, 3.66, side * 4.65, 0.236, 0, brass);
+  const shortNose = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 3.63, 12), noseFelt);
+  shortNose.rotation.x = Math.PI / 2;
+  shortNose.position.set(side * 4.35, 0.135, 0);
+  shortNose.receiveShadow = true;
+  scene.add(shortNose);
 }
 for (const [x, z] of POCKETS) {
   const hole = new THREE.Mesh(new THREE.CircleGeometry(TABLE.pocketRadius, 48), pocketMaterial);
   hole.rotation.x = -Math.PI / 2;
   hole.position.set(x, 0.06, z);
   scene.add(hole);
-  const rim = new THREE.Mesh(
-    new THREE.TorusGeometry(TABLE.pocketRadius + 0.016, 0.018, 10, 48),
-    brass,
+  // A dark, softly rounded leather mouth reads as a recessed pocket.
+  // Avoid the bright complete metal hoops of the original pool-style prototype.
+  const lip = new THREE.Mesh(
+    new THREE.TorusGeometry(TABLE.pocketRadius + 0.005, 0.030, 10, 48),
+    pocketLeather,
   );
-  rim.rotation.x = -Math.PI / 2;
-  rim.position.set(x, 0.065, z);
-  scene.add(rim);
+  lip.rotation.x = -Math.PI / 2;
+  lip.position.set(x, 0.066, z);
+  scene.add(lip);
+}
+
+// Authentic, subtle baulk line, D arc and colour spots. All sit above the cloth
+// but below the balls, and don't participate in physics/raycaster collisions.
+const clothInk = new THREE.MeshBasicMaterial({
+  color: 0xe8e6d1, transparent: true, opacity: 0.52, depthWrite: false,
+});
+const line = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.003, 2 * TABLE.halfZ), clothInk);
+line.position.set(BAULK.x, 0.056, 0);
+scene.add(line);
+const dPoints = Array.from({ length: 65 }, (_, i) => {
+  const angle = Math.PI * i / 64;
+  return new THREE.Vector3(
+    BAULK.x - BAULK.radius * Math.sin(angle), 0.058, BAULK.radius * Math.cos(angle),
+  );
+});
+const dArc = new THREE.Mesh(
+  new THREE.TubeGeometry(new THREE.CatmullRomCurve3(dPoints), 64, 0.007, 5, false),
+  clothInk,
+);
+scene.add(dArc);
+const spotGeometry = new THREE.CircleGeometry(0.026, 24);
+const spotMaterial = new THREE.MeshBasicMaterial({
+  color: 0xf2ead6, transparent: true, opacity: 0.70, depthWrite: false,
+  side: THREE.DoubleSide,
+});
+for (const { x, z } of COLOUR_SPOTS) {
+  const spot = new THREE.Mesh(spotGeometry, spotMaterial);
+  spot.rotation.x = -Math.PI / 2;
+  spot.position.set(x, 0.060, z);
+  scene.add(spot);
 }
 // Leather pockets and warm brass leg details give scale even at a distance.
 for (const x of [-3.72, 3.72]) for (const z of [-1.64, 1.64]) {
@@ -299,7 +345,7 @@ function updateCue() {
   // Put the actual tip just behind the white, with a small power-dependent draw-back.
   // 1.34 is the tip's local x coordinate inside the cue-stick model.
   const offset = 1.34 + TABLE.ballRadius + 0.04 + (Number(powerInput.value) / 100) * 0.15;
-  cueStick.position.set(cue.x - aim.x * offset, TABLE.ballRadius + 0.07, cue.z - aim.z * offset);
+  cueStick.position.set(cue.x - aim.x * offset, TABLE.ballRadius + 0.052, cue.z - aim.z * offset);
   cueDirection.copy(aim);
   cueStick.rotation.y = -Math.atan2(aim.z, aim.x);
   const front = new THREE.Vector3(cue.x + aim.x * 0.20, 0.095, cue.z + aim.z * 0.20);
@@ -413,7 +459,7 @@ function frame(now) {
   for (const b of balls) {
     const model = models.get(b.id);
     model.visible = !b.pocketed;
-    model.position.set(b.x, TABLE.ballRadius + 0.07, b.z);
+    model.position.set(b.x, TABLE.ballRadius + 0.052, b.z);
   }
   updateCue();
   renderer.render(scene, camera);
