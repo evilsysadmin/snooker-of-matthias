@@ -61,7 +61,9 @@ export function createRack() {
 }
 
 export function ballsMoving(balls) {
-  return balls.some((b) => !b.pocketed && (b.vx * b.vx + b.vz * b.vz) > 0.0001);
+  return balls.some((b) => !b.pocketed &&
+    ((b.vx * b.vx + b.vz * b.vz) > 0.0001 ||
+      (b.id === 0 && Math.hypot(b.spinVx || 0, b.spinVz || 0) > 0.01)));
 }
 
 export function strikeCue(balls, dx, dz, power, followDraw = 0) {
@@ -113,7 +115,11 @@ export function stepPhysics(balls, dt) {
       const scale = newSpeed / speed;
       b.vx *= scale;
       b.vz *= scale;
-      if (newSpeed < 0.055) { b.vx = 0; b.vz = 0; }
+      // Do not snap a still-spinning white to rest: a weak draw needs
+      // multiple 120 Hz traction steps to build up a visible reverse roll.
+      const cueStillSpinning = b.id === 0 &&
+        Math.hypot(b.spinVx || 0, b.spinVz || 0) > 0.01;
+      if (newSpeed < 0.055 && !cueStillSpinning) { b.vx = 0; b.vz = 0; }
     }
   }
 
