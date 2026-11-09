@@ -34,10 +34,11 @@ app.innerHTML = [
     '<div class="shot-controls">',
       '<div class="power"><div class="power-heading"><span>POTENCIA</span><output id="power-value" for="power">55%</output></div>',
       '<input id="power" type="range" min="0" max="100" value="55" aria-label="Potencia del golpe" /></div>',
+      '<button id="spin-cycle" class="spin-cycle" type="button" data-spin="0" aria-label="Efecto de la blanca: centro. Pulsa para cambiar" title="Efecto de la blanca: centro · pulsa para cambiar">● Centro</button>',
       '<button id="strike" class="strike" type="button"><span>⚡</span> GOLPEAR <kbd>ESPACIO</kbd></button>',
       '<button id="restart" class="restart" type="button" title="Recolocar las bolas" aria-label="Reiniciar partida">↺</button>',
     '</div>',
-    '<p class="hint">Apunta con ratón o dedo: la guía marca el primer contacto. Mantén ESPACIO para cargar; suelta para golpear. R reinicia.</p>',
+    '<p class="hint">Apunta con ratón o dedo: la guía marca el primer contacto. Efecto: centro, seguimiento o retroceso. ESPACIO carga y dispara; R reinicia.</p>',
     '<div class="fine-aim" role="group" aria-label="Ajuste fino de puntería">',
       '<button id="fine-left" class="fine-step" type="button" aria-label="Girar puntería 0,5 grados a la izquierda">↶ <span>0,5°</span></button>',
       '<div class="fine-status"><small>AJUSTE FINO</small><output id="fine-angle" aria-live="polite">0,0°</output></div>',
@@ -54,6 +55,7 @@ const pocketDisplay = document.querySelector('#potted');
 const commentary = document.querySelector('#commentary');
 const strikeButton = document.querySelector('#strike');
 const restartButton = document.querySelector('#restart');
+const spinButton = document.querySelector('#spin-cycle');
 const powerInput = document.querySelector('#power');
 const powerValue = document.querySelector('#power-value');
 const topCameraButton = document.querySelector('#camera-top');
@@ -271,6 +273,7 @@ let wasMoving = false;
 let scratchPending = false;
 let dirtyHUD = true;
 let fineAimSteps = 0;
+let cueSpin = 0; // -1: draw, 0: centre, +1: follow
 
 function setFineAngleDisplay() {
   const change = fineAimSteps * FINE_AIM_STEP_DEGREES;
@@ -287,6 +290,25 @@ function nudgeAim(direction) {
 }
 fineLeft.addEventListener('click', () => nudgeAim(-1));
 fineRight.addEventListener('click', () => nudgeAim(1));
+const spinChoices = [
+  { value: 0, label: '● Centro', name: 'centro' },
+  { value: 1, label: '↑ Sigue', name: 'seguimiento' },
+  { value: -1, label: '↓ Retro', name: 'retroceso' },
+];
+function updateSpinButton() {
+  const choice = spinChoices.find((item) => item.value === cueSpin);
+  spinButton.textContent = choice.label;
+  spinButton.dataset.spin = String(choice.value);
+  spinButton.setAttribute('aria-label', 'Efecto de la blanca: ' + choice.name + '. Pulsa para cambiar');
+  spinButton.title = 'Efecto de la blanca: ' + choice.name + ' · pulsa para cambiar';
+}
+spinButton.addEventListener('click', () => {
+  if (ballsMoving(balls) || balls[0].pocketed) return;
+  const index = spinChoices.findIndex((item) => item.value === cueSpin);
+  cueSpin = spinChoices[(index + 1) % spinChoices.length].value;
+  updateSpinButton();
+});
+updateSpinButton();
 
 function say(message) { commentary.textContent = message; }
 function formatScore() {
@@ -304,10 +326,12 @@ function restart() {
   dirtyHUD = true;
   fineAimSteps = 0;
   setFineAngleDisplay();
+  cueSpin = 0;
+  updateSpinButton();
   say('Matthias: Otra oportunidad de desafiar a la geometría. Adelante, campeón.');
 }
 function shoot(power = Number(powerInput.value) / 100) {
-  if (strikeCue(balls, aim.x, aim.z, power)) {
+  if (strikeCue(balls, aim.x, aim.z, power, cueSpin)) {
     shots++;
     dirtyHUD = true;
     say(['Matthias: Veamos si la física está de tu parte.',
@@ -526,6 +550,7 @@ function frame(now) {
   wasMoving = ballsMoving(balls);
   if (dirtyHUD) { formatScore(); dirtyHUD = false; }
   strikeButton.disabled = wasMoving || balls[0].pocketed;
+  spinButton.disabled = strikeButton.disabled;
   fineLeft.disabled = strikeButton.disabled;
   fineRight.disabled = strikeButton.disabled;
   for (const b of balls) {
