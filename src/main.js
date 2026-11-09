@@ -5,6 +5,7 @@ import {
 import './styles.css';
 import { createShotCharge } from './shotCharge.js';
 import { predictFirstContact } from './aimPrediction.js';
+import { FINE_AIM_STEP_DEGREES, rotateAim } from './fineAim.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -37,6 +38,11 @@ app.innerHTML = [
       '<button id="restart" class="restart" type="button" title="Recolocar las bolas" aria-label="Reiniciar partida">↺</button>',
     '</div>',
     '<p class="hint">Apunta con ratón o dedo: la guía marca el primer contacto. Mantén ESPACIO para cargar; suelta para golpear. R reinicia.</p>',
+    '<div class="fine-aim" role="group" aria-label="Ajuste fino de puntería">',
+      '<button id="fine-left" class="fine-step" type="button" aria-label="Girar puntería 0,5 grados a la izquierda">↶ <span>0,5°</span></button>',
+      '<div class="fine-status"><small>AJUSTE FINO</small><output id="fine-angle" aria-live="polite">0,0°</output></div>',
+      '<button id="fine-right" class="fine-step" type="button" aria-label="Girar puntería 0,5 grados a la derecha"><span>0,5°</span> ↷</button>',
+    '</div>',
   '</section>',
   '<div class="vignette" aria-hidden="true"></div>',
   '</main>',
@@ -52,6 +58,9 @@ const powerInput = document.querySelector('#power');
 const powerValue = document.querySelector('#power-value');
 const topCameraButton = document.querySelector('#camera-top');
 const perspectiveCameraButton = document.querySelector('#camera-3d');
+const fineLeft = document.querySelector('#fine-left');
+const fineRight = document.querySelector('#fine-right');
+const fineAngle = document.querySelector('#fine-angle');
 const charge = createShotCharge();
 
 const scene = new THREE.Scene();
@@ -261,6 +270,23 @@ let dragging = false;
 let wasMoving = false;
 let scratchPending = false;
 let dirtyHUD = true;
+let fineAimSteps = 0;
+
+function setFineAngleDisplay() {
+  const change = fineAimSteps * FINE_AIM_STEP_DEGREES;
+  const prefix = change > 0 ? '+' : change < 0 ? '−' : '';
+  fineAngle.textContent = prefix + Math.abs(change).toFixed(1).replace('.', ',') + '°';
+}
+function nudgeAim(direction) {
+  if (ballsMoving(balls) || balls[0].pocketed) return;
+  const rotated = rotateAim(aim.x, aim.z, direction * FINE_AIM_STEP_DEGREES);
+  if (!rotated) return;
+  aim.set(rotated.x, 0, rotated.z);
+  fineAimSteps += direction;
+  setFineAngleDisplay();
+}
+fineLeft.addEventListener('click', () => nudgeAim(-1));
+fineRight.addEventListener('click', () => nudgeAim(1));
 
 function say(message) { commentary.textContent = message; }
 function formatScore() {
@@ -276,6 +302,8 @@ function restart() {
   scratchPending = false;
   wasMoving = false;
   dirtyHUD = true;
+  fineAimSteps = 0;
+  setFineAngleDisplay();
   say('Matthias: Otra oportunidad de desafiar a la geometría. Adelante, campeón.');
 }
 function shoot(power = Number(powerInput.value) / 100) {
@@ -344,6 +372,9 @@ function pointAim(event) {
   const dz = point.z - balls[0].z;
   if (Math.hypot(dx, dz) < TABLE.ballRadius * 2) return;
   aim.set(dx, 0, dz).normalize();
+  // Direct pointer aiming establishes a new baseline for fine adjustments.
+  fineAimSteps = 0;
+  setFineAngleDisplay();
 }
 const canvas = renderer.domElement;
 canvas.style.touchAction = 'none';
@@ -495,6 +526,8 @@ function frame(now) {
   wasMoving = ballsMoving(balls);
   if (dirtyHUD) { formatScore(); dirtyHUD = false; }
   strikeButton.disabled = wasMoving || balls[0].pocketed;
+  fineLeft.disabled = strikeButton.disabled;
+  fineRight.disabled = strikeButton.disabled;
   for (const b of balls) {
     const model = models.get(b.id);
     model.visible = !b.pocketed;
