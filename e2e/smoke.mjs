@@ -88,6 +88,35 @@ try {
     });
     await page.mouse.move(brownScreen.x, brownScreen.y);
     await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '18');
+    // The actual opening rack offers a clear line towards the upper-left
+    // corner's long-rail jaw. The guide must now identify that physical jaw.
+    const jawScreen = await page.locator('#viewport canvas').evaluate((canvas) => {
+      const rect = canvas.getBoundingClientRect();
+      const aspect = rect.width / rect.height;
+      const portrait = rect.width <= 700 && rect.height > rect.width * 1.15;
+      const halfWorldWidth = portrait ? 2.51 : 4.75;
+      const halfWorldHeight = portrait ? 4.75 : 2.51;
+      const halfHeight = Math.max(halfWorldHeight / 0.89, halfWorldWidth / (aspect * 0.89));
+      const scale = rect.height / (2 * halfHeight);
+      const x = -4.12, z = 2.105;
+      return portrait
+        ? { x: rect.left + rect.width / 2 + z * scale,
+            y: rect.top + rect.height / 2 - x * scale }
+        : { x: rect.left + rect.width / 2 + x * scale,
+            y: rect.top + rect.height / 2 + z * scale };
+    });
+    await page.mouse.move(jawScreen.x, jawScreen.y);
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimJaw !== '');
+    assert.equal(await page.locator('#viewport').getAttribute('data-aim-target'), '',
+      'a jaw hit must not be incorrectly marked as a ball hit');
+    await page.screenshot({
+      path: 'artifacts/snooker-' + config.name + '-jaw-guide.png', fullPage: true,
+      animations: 'disabled',
+    });
+    await page.mouse.move(brownScreen.x, brownScreen.y);
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '18');
+    assert.equal(await page.locator('#viewport').getAttribute('data-aim-jaw'), '',
+      'direct re-aiming clears the previous jaw highlight');
     if (config.isMobile) {
       assert.equal(await page.locator('#fine-angle').innerText(), '0,0°');
       await page.locator('#fine-right').tap();
