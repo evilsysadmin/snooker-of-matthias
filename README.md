@@ -4,7 +4,7 @@ A deliberately small but **playable 3D snooker** experiment for the ShadowOps fa
 
 ## First POC
 
-- Real 3D table, rails, pockets, cue and 22 snooker balls: 15 reds, six coloured balls and the white.
+- Real 3D table with cloth baulk/D markings, colour spots, rounded cushion noses, dark leather-look pocket mouths, cue and 22 snooker balls: 15 reds, six coloured balls and the white.
 - Play with the default true overhead (orthographic) camera or switch instantly to the cinematic 3D camera using **Cenital / 3D**; both use the same table, balls and shot state.
 - Aim by moving/dragging on the table in either camera; choose power and strike via button or Space.
 - Fixed-step deterministic collision, cushions, friction, pocket capture, white-ball scratch/respawn.
