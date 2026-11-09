@@ -44,6 +44,10 @@ try {
     assert.ok(layout.viewport.bottom <= layout.controls.top + 1, 'table viewport clears controls');
     assert.ok(layout.switcher.top >= layout.header.bottom - 1, 'camera switch clears header');
     assert.ok(layout.switcher.bottom < layout.controls.top, 'camera switch clears controls');
+    if (config.isMobile) {
+      assert.ok(layout.switcher.bottom <= layout.viewport.top + 35,
+        'mobile camera selector stays above the upper tabletop cushion');
+    }
     assert.ok(layout.pageWidth <= layout.windowWidth + 1, 'no horizontal scrolling');
     await page.screenshot({
       path: 'artifacts/snooker-' + config.name + '-top.png', fullPage: true,
