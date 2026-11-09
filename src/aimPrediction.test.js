@@ -47,6 +47,31 @@ test('pocketed, rear and beyond-cushion balls are excluded from the preview', ()
   assert.ok(Math.abs(hit.distance - (TABLE.halfX - TABLE.ballRadius)) < 1e-9);
 });
 
+test('aiming towards a pocket shoulder ends at jaw contact, not through the cushion', () => {
+  const balls = [cue(0.22, 1.6)];
+  const before = structuredClone(balls);
+  const preview = predictFirstContact(balls, 0, 1);
+  assert.equal(preview.ballId, null);
+  assert.notEqual(preview.jawIndex, null);
+  assert.ok(preview.z < TABLE.halfZ - TABLE.ballRadius,
+    'the round jaw must be hit before the straight cushion');
+  assert.ok(preview.z > 1.85, 'jaw contact lies at the actual pocket mouth');
+  assert.ok(Math.abs(preview.x - 0.22) < 1e-9);
+  assert.deepEqual(balls, before, 'prediction is pure geometry');
+});
+
+test('a ball before the jaw still wins the first-contact preview', () => {
+  const preview = predictFirstContact([cue(0.22, 1.6), object(7, 0.22, 1.8)], 0, 1);
+  assert.equal(preview.ballId, 7);
+  assert.equal(preview.jawIndex, null);
+});
+
+test('straight middle pocket approach remains unblocked by jaws', () => {
+  const preview = predictFirstContact([cue(0, 1.6)], 0, 1);
+  assert.equal(preview.ballId, null);
+  assert.equal(preview.jawIndex, null);
+});
+
 test('invalid directions and scratched white yield no prediction', () => {
   assert.equal(predictFirstContact([cue()], 0, 0), null);
   assert.equal(predictFirstContact([cue()], Infinity, 0), null);
