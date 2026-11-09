@@ -125,7 +125,8 @@ try {
     assert.equal(await page.locator('#viewport').getAttribute('data-camera'), '3d');
     assert.equal(await page.locator('#shots').innerText(), '00');
     await page.locator('#camera-top').click();
-    await page.locator('#strike').click();
+    if (config.isMobile) await page.locator('#strike').tap();
+    else await page.locator('#strike').click();
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
     await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '',
       undefined, { timeout: 5000 });
@@ -138,6 +139,34 @@ try {
     await page.locator('#restart').click();
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');
     assert.equal(await spinControl.getAttribute('data-spin'), '0', 'restart resets spin');
+    // The stroke button accepts a deliberate hold on both desktop and mobile.
+    const strikeBounds = await page.locator('#strike').boundingBox();
+    const sx = strikeBounds.x + strikeBounds.width / 2;
+    const sy = strikeBounds.y + strikeBounds.height / 2;
+    await page.mouse.move(sx, sy);
+    await page.mouse.down();
+    await page.waitForFunction(() => document.querySelector('#strike')?.classList.contains('charging') &&
+      Number(document.querySelector('#power')?.value) >= 35);
+    assert.equal(await page.locator('#shots').innerText(), '00', 'holding only charges, no premature shot');
+    await page.screenshot({
+      path: 'artifacts/snooker-' + config.name + '-charging.png', fullPage: true,
+      animations: 'disabled',
+    });
+    await page.mouse.up();
+    await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
+    assert.equal(await page.locator('#strike').evaluate((el) => el.classList.contains('charging')),
+      false, 'charging state clears upon release');
+    await page.locator('#restart').click();
+    await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');
+    // Dragging off the button cancels the charge rather than firing unexpectedly.
+    await page.mouse.move(sx, sy);
+    await page.mouse.down();
+    await page.waitForFunction(() => Number(document.querySelector('#power')?.value) >= 25);
+    await page.mouse.move(sx, sy - 130);
+    await page.mouse.up();
+    assert.equal(await page.locator('#shots').innerText(), '00', 'release outside cancels');
+    assert.equal(await page.locator('#strike').evaluate((el) => el.classList.contains('charging')),
+      false, 'cancel clears charging state');
     if (config.isMobile) assert.equal(await page.locator('#fine-angle').innerText(), '0,0°',
       'restart resets the fine-aim adjustment');
     // Blur the reset button so Space exercises gameplay charge, not native button activation.
