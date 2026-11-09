@@ -54,6 +54,25 @@ try {
         'mobile camera selector stays above the upper tabletop cushion');
     }
     assert.ok(layout.pageWidth <= layout.windowWidth + 1, 'no horizontal scrolling');
+    // Point at the brown spot from the opening cue position. Project known
+    // world coordinates through the same orthographic framing in both sizes.
+    const brownScreen = await page.locator('#viewport canvas').evaluate((canvas) => {
+      const rect = canvas.getBoundingClientRect();
+      const aspect = rect.width / rect.height;
+      const portrait = rect.width <= 700 && rect.height > rect.width * 1.15;
+      const halfWorldWidth = portrait ? 2.51 : 4.75;
+      const halfWorldHeight = portrait ? 4.75 : 2.51;
+      const halfHeight = Math.max(halfWorldHeight / 0.89, halfWorldWidth / (aspect * 0.89));
+      const scale = rect.height / (2 * halfHeight);
+      const brownX = -2.30, brownZ = 0;
+      return portrait
+        ? { x: rect.left + rect.width / 2 + brownZ * scale,
+            y: rect.top + rect.height / 2 - brownX * scale }
+        : { x: rect.left + rect.width / 2 + brownX * scale,
+            y: rect.top + rect.height / 2 + brownZ * scale };
+    });
+    await page.mouse.move(brownScreen.x, brownScreen.y);
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '18');
     await page.screenshot({
       path: 'artifacts/snooker-' + config.name + '-top.png', fullPage: true,
       animations: 'disabled',
@@ -61,6 +80,8 @@ try {
     await page.locator('#camera-3d').click();
     assert.equal(await page.locator('#viewport').getAttribute('data-camera'), '3d');
     assert.equal(await page.locator('#camera-3d').getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('#viewport').getAttribute('data-aim-target'), '18',
+      'camera switch preserves predicted first contact');
     await page.screenshot({
       path: 'artifacts/snooker-' + config.name + '-3d.png', fullPage: true,
       animations: 'disabled',
@@ -75,6 +96,8 @@ try {
     await page.locator('#camera-top').click();
     await page.locator('#strike').click();
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '',
+      undefined, { timeout: 5000 });
     await page.locator('#camera-3d').click();
     assert.equal(await page.locator('#shots').innerText(), '01', 'camera switch preserves live game');
     await page.locator('#camera-top').click();
