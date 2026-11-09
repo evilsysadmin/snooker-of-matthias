@@ -1,5 +1,11 @@
 # Snooker of Matthias — agent instructions
 
+## Cuenta GitHub para ShadowOps
+
+- **Obligatorio:** al operar sobre repositorios `evilsysadmin/*`, usar explícitamente la cuenta/conexión de GitHub **ShadowOps** (perfil `evilsysadmin`) para lecturas, escrituras, PR, checks, merges y workflows. Si la herramienta ofrece `link_id`, seleccionar el **identificador vigente** asociado a `link_name: ShadowOps` en el esquema de esa sesión; nunca omitirlo cuando existan varias cuentas.
+- **Nullforge** (perfil `nullforgeops`) es una conexión independiente: no utilizarla para ShadowOps ni como alternativa automática. Si ShadowOps falla o no está disponible, detener la operación, diagnosticar la selección de cuenta y comunicar el bloqueo; no dar por desconectada la cuenta sin haber probado su `link_id` explícito.
+- Verificar propietario y repositorio antes de operar; no almacenar `link_id`, tokens, claves o credenciales en Git: los identificadores de conexión pueden cambiar al reconectar.
+
 - This is a separate ShadowOps game repository. Its initial milestone is a genuinely playable **3D** browser billiards table, not a static mock. Prefer shipping a working shot over building speculative game modes.
 - Graphics are Three.js 3D; initial physics is a deterministic fixed-step planar billiards simulation independent of rendering. Keep it testable without the browser. Do not call this a full snooker rules engine; first release is free practice / pocketing.
 - First prioritize aim, striking, collisions, pocketing, scratch, restart and responsive phone/desktop controls. Then visual polish and richer rules, in small tested PRs. Do not make cue-ball mechanics depend on a remote LLM.
