@@ -35,6 +35,7 @@ try {
       const rect = (query) => document.querySelector(query).getBoundingClientRect();
       return {
         viewport: rect('#viewport'), header: rect('.topbar'),
+        brand: rect('.brand'), scoreboard: rect('.scoreboard'),
         controls: rect('.bottom-panel'), switcher: rect('.camera-switch'),
         pageWidth: document.documentElement.scrollWidth,
         windowWidth: window.innerWidth,
@@ -42,7 +43,11 @@ try {
     });
     assert.ok(layout.viewport.top >= layout.header.bottom - 1, 'table viewport clears header');
     assert.ok(layout.viewport.bottom <= layout.controls.top + 1, 'table viewport clears controls');
-    assert.ok(layout.switcher.top >= layout.header.bottom - 1, 'camera switch clears header');
+    const overlaps = (a, b) =>
+      a.left < b.right - 1 && a.right > b.left + 1 &&
+      a.top < b.bottom - 1 && a.bottom > b.top + 1;
+    assert.ok(!overlaps(layout.switcher, layout.brand), 'camera switch clears brand');
+    assert.ok(!overlaps(layout.switcher, layout.scoreboard), 'camera switch clears scoreboard');
     assert.ok(layout.switcher.bottom < layout.controls.top, 'camera switch clears controls');
     if (config.isMobile) {
       assert.ok(layout.switcher.bottom <= layout.viewport.top + 35,
