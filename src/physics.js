@@ -3,8 +3,13 @@
 export const TABLE = Object.freeze({
   halfX: 4.35,
   halfZ: 2.15,
-  ballRadius: 0.105,
-  pocketRadius: 0.31,
+  // Slightly larger than regulation relative to our table so balls stay
+  // readable at a 390px mobile width. Previous 0.105 looked pool-sized.
+  ballRadius: 0.075,
+  // Capture radii match the visible mouths. Middle pockets are a little more
+  // forgiving; these are tuned game approximations, not WPBSA pocket templates.
+  pocketRadius: 0.175,
+  middlePocketRadius: 0.195,
   cushionRestitution: 0.82,
   ballRestitution: 0.94,
   rollingDeceleration: 1.55,
@@ -16,13 +21,13 @@ export const TABLE = Object.freeze({
 export const OBJECT_BALL_COUNT = 21;
 
 export const POCKETS = Object.freeze([
-  [-4.33, -2.15], [0, -2.18], [4.33, -2.15],
-  [-4.33, 2.15], [0, 2.18], [4.33, 2.15],
+  [-4.33, -2.15, TABLE.pocketRadius], [0, -2.18, TABLE.middlePocketRadius], [4.33, -2.15, TABLE.pocketRadius],
+  [-4.33, 2.15, TABLE.pocketRadius], [0, 2.18, TABLE.middlePocketRadius], [4.33, 2.15, TABLE.pocketRadius],
 ]);
 
 // The cloth markings and opening rack use the same physical spots.
 // White marks are cosmetic only; coloured-ball respotting is not yet implemented.
-export const BAULK = Object.freeze({ x: -2.30, radius: 0.93 });
+export const BAULK = Object.freeze({ x: -2.55, radius: 0.71 });
 export const COLOUR_SPOTS = Object.freeze([
   Object.freeze({ id: 16, x: BAULK.x, z: BAULK.radius }),  // Yellow
   Object.freeze({ id: 17, x: BAULK.x, z: -BAULK.radius }), // Green
@@ -35,6 +40,7 @@ export const COLOUR_SPOTS = Object.freeze([
 export function createRack() {
   const r = TABLE.ballRadius;
   const gap = 2 * r + 0.008;
+  const redApexX = COLOUR_SPOTS.find((spot) => spot.id === 20).x + gap;
   const balls = [{
     id: 0, number: 0, x: -2.9, z: 0.38, vx: 0, vz: 0, pocketed: false,
   }];
@@ -45,7 +51,7 @@ export function createRack() {
     for (let col = 0; col <= row; col++) {
       balls.push({
         id: redId, number: redId++,
-        x: 1.55 + row * gap * Math.sqrt(3) / 2,
+        x: redApexX + row * gap * Math.sqrt(3) / 2,
         z: (col - row / 2) * gap,
         vx: 0, vz: 0, pocketed: false,
       });
@@ -173,8 +179,8 @@ export function stepPhysics(balls, dt) {
 }
 
 function capturePocket(ball, events) {
-  for (const [px, pz] of POCKETS) {
-    if (Math.hypot(ball.x - px, ball.z - pz) < TABLE.pocketRadius) {
+  for (const [px, pz, radius] of POCKETS) {
+    if (Math.hypot(ball.x - px, ball.z - pz) < radius) {
       ball.pocketed = true;
       ball.vx = 0;
       ball.vz = 0;
