@@ -52,6 +52,11 @@ button { border: 0; cursor: pointer; transition: background .2s, transform .2s; 
 button:active { transform: scale(.97); }
 .strike { display: flex; align-items: center; justify-content: center; gap: 11px; background: #e1c388; color: #192522; font-weight: 800; font-size: 12px; letter-spacing: .055em; border-radius: 11px; min-height: 46px; padding: 0 23px; white-space: nowrap; }
 .strike:hover:not(:disabled) { background: #f4dca4; }
+.strike { touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none; }
+.strike.charging { background: #f4dca4; box-shadow: 0 0 0 2px #e1c38870, 0 0 25px #e1c38866; transform: scale(0.985); }
+.strike.charging span { animation: stroke-pulse .7s ease-in-out infinite alternate; }
+@keyframes stroke-pulse { from { transform: translateY(0); } to { transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { .strike.charging span { animation: none; } }
 .strike:disabled { opacity: .45; cursor: not-allowed; }
 .strike span { font-size: 19px; }
 kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-radius: 4px; padding: 4px 5px; }

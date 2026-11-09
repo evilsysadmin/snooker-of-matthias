@@ -6,6 +6,7 @@ import './styles.css';
 import { createShotCharge } from './shotCharge.js';
 import { predictFirstContact } from './aimPrediction.js';
 import { FINE_AIM_STEP_DEGREES, rotateAim } from './fineAim.js';
+import { resolveStrokePower } from './strokeInteraction.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -35,10 +36,10 @@ app.innerHTML = [
       '<div class="power"><div class="power-heading"><span>POTENCIA</span><output id="power-value" for="power">55%</output></div>',
       '<input id="power" type="range" min="0" max="100" value="55" aria-label="Potencia del golpe" /></div>',
       '<button id="spin-cycle" class="spin-cycle" type="button" data-spin="0" aria-label="Efecto de la blanca: centro. Pulsa para cambiar" title="Efecto de la blanca: centro · pulsa para cambiar">● Centro</button>',
-      '<button id="strike" class="strike" type="button"><span>⚡</span> GOLPEAR <kbd>ESPACIO</kbd></button>',
+      '<button id="strike" class="strike" type="button" aria-label="Golpear: toca para usar la potencia elegida, mantén pulsado para cargar" title="Toca para golpear · mantén pulsado para cargar"><span>⚡</span> GOLPEAR <kbd>ESPACIO</kbd></button>',
       '<button id="restart" class="restart" type="button" title="Recolocar las bolas" aria-label="Reiniciar partida">↺</button>',
     '</div>',
-    '<p class="hint">Apunta con ratón o dedo: la guía marca el primer contacto. Efecto: centro, seguimiento o retroceso. ESPACIO carga y dispara; R reinicia.</p>',
+    '<p class="hint">Apunta en la mesa. Toca GOLPEAR o mantén para cargar; suelta para tirar. ESPACIO también carga. R reinicia.</p>',
     '<div class="fine-aim" role="group" aria-label="Ajuste fino de puntería">',
       '<button id="fine-left" class="fine-step" type="button" aria-label="Girar puntería 0,5 grados a la izquierda">↶ <span>0,5°</span></button>',
       '<div class="fine-status"><small>AJUSTE FINO</small><output id="fine-angle" aria-live="polite">0,0°</output></div>',
@@ -274,6 +275,8 @@ let scratchPending = false;
 let dirtyHUD = true;
 let fineAimSteps = 0;
 let cueSpin = 0; // -1: draw, 0: centre, +1: follow
+let pointerStroke = null;
+let strokeAnimation = null;
 
 function setFineAngleDisplay() {
   const change = fineAimSteps * FINE_AIM_STEP_DEGREES;
@@ -316,8 +319,8 @@ function formatScore() {
   pocketDisplay.innerHTML = String(potted).padStart(2, '0') + ' <small>/ ' + OBJECT_BALL_COUNT + '</small>';
 }
 function restart() {
-  charge.cancel();
-  powerInput.classList.remove('charging');
+  cancelCharge();
+  strokeAnimation = null;
   balls = createRack();
   shots = 0;
   potted = 0;
@@ -331,7 +334,10 @@ function restart() {
   say('Matthias: Otra oportunidad de desafiar a la geometría. Adelante, campeón.');
 }
 function shoot(power = Number(powerInput.value) / 100) {
+  const cue = balls[0];
+  const shotPosition = { x: cue.x, z: cue.z, dx: aim.x, dz: aim.z };
   if (strikeCue(balls, aim.x, aim.z, power, cueSpin)) {
+    strokeAnimation = { ...shotPosition, at: performance.now(), power };
     shots++;
     dirtyHUD = true;
     say(['Matthias: Veamos si la física está de tu parte.',
@@ -340,7 +346,43 @@ function shoot(power = Number(powerInput.value) / 100) {
       'Matthias: Jawohl. Que las bandas decidan tu destino.'][shots % 4]);
   }
 }
-strikeButton.addEventListener('click', () => shoot());
+// Pointer controls share the same charge waveform as SPACE. A quick tap still
+// fires with the chosen slider power; holding makes the stroke tactile on touch.
+strikeButton.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0 || strikeButton.disabled || charge.active) return;
+  const now = performance.now();
+  if (!charge.start(now)) return;
+  pointerStroke = { id: event.pointerId, started: now, preset: Number(powerInput.value) / 100 };
+  strikeButton.setPointerCapture(event.pointerId);
+  powerInput.classList.add('charging');
+  strikeButton.classList.add('charging');
+});
+strikeButton.addEventListener('pointerup', (event) => {
+  if (!pointerStroke || pointerStroke.id !== event.pointerId) return;
+  const held = pointerStroke;
+  const now = performance.now();
+  const rect = strikeButton.getBoundingClientRect();
+  const inside = event.clientX >= rect.left && event.clientX <= rect.right &&
+    event.clientY >= rect.top && event.clientY <= rect.bottom;
+  const charged = charge.release(now);
+  pointerStroke = null;
+  powerInput.classList.remove('charging');
+  strikeButton.classList.remove('charging');
+  if (!inside) { paintPower(held.preset * 100); return; }
+  const power = resolveStrokePower(now - held.started, held.preset, charged);
+  paintPower(power * 100);
+  if (power > 0) shoot(power);
+});
+strikeButton.addEventListener('pointercancel', cancelCharge);
+strikeButton.addEventListener('lostpointercapture', () => {
+  if (pointerStroke) cancelCharge();
+});
+// Keyboard and accessibility activation produce click(detail=0), not a
+// pointer release; never fire twice after a mouse/touch pointerup.
+strikeButton.addEventListener('click', (event) => {
+  if (event.detail === 0) shoot();
+});
+strikeButton.addEventListener('contextmenu', (event) => event.preventDefault());
 restartButton.addEventListener('click', restart);
 function paintPower(value) {
   const percent = Math.max(0, Math.min(100, Math.round(value)));
@@ -352,8 +394,11 @@ powerInput.addEventListener('input', () => paintPower(Number(powerInput.value)))
 paintPower(Number(powerInput.value));
 
 function cancelCharge() {
+  if (pointerStroke) paintPower(pointerStroke.preset * 100);
+  pointerStroke = null;
   charge.cancel();
   powerInput.classList.remove('charging');
+  strikeButton.classList.remove('charging');
 }
 window.addEventListener('keydown', (event) => {
   // Keep native Space activation for focused buttons/sliders (including camera controls).
@@ -362,17 +407,21 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'Space') {
     event.preventDefault();
     if (!event.repeat && !ballsMoving(balls) && !balls[0].pocketed) {
-      if (charge.start(performance.now())) powerInput.classList.add('charging');
+      if (charge.start(performance.now())) {
+        powerInput.classList.add('charging');
+        strikeButton.classList.add('charging');
+      }
     }
     return;
   }
   if (!event.repeat && event.key.toLowerCase() === 'r') restart();
 });
 window.addEventListener('keyup', (event) => {
-  if (event.code !== 'Space' || !charge.active) return;
+  if (event.code !== 'Space' || !charge.active || pointerStroke) return;
   event.preventDefault();
   const power = charge.release(performance.now());
   powerInput.classList.remove('charging');
+  strikeButton.classList.remove('charging');
   paintPower(power * 100);
   if (power > 0) shoot(power);
 });
@@ -413,14 +462,34 @@ canvas.addEventListener('pointermove', (event) => {
 canvas.addEventListener('pointerup', () => { dragging = false; });
 canvas.addEventListener('pointercancel', () => { dragging = false; });
 
-function updateCue() {
+function updateCue(now) {
   const cue = balls[0];
-  const available = !cue.pocketed && !ballsMoving(balls);
-  cueStick.visible = available;
-  guide.visible = available;
   ghostRing.visible = false;
   impactDot.visible = false;
   viewport.dataset.aimTarget = '';
+  // Animate a short, bounded cue-tip strike before hiding the stick during roll.
+  // Only the illustration animates: actual physics starts immediately on release.
+  if (strokeAnimation) {
+    const elapsed = now - strokeAnimation.at;
+    if (elapsed < 140) {
+      const { x, z, dx, dz, power } = strokeAnimation;
+      const travel = 0.028 + power * 0.15;
+      const progress = elapsed < 65 ? (elapsed / 65) ** 2 :
+        Math.max(0, 1 - (elapsed - 65) / 75);
+      const offset = 1.34 + TABLE.ballRadius + 0.04 + power * 0.15 - travel * progress;
+      cueStick.position.set(x - dx * offset, TABLE.ballRadius + 0.052, z - dz * offset);
+      cueStick.rotation.y = -Math.atan2(dz, dx);
+      cueStick.visible = true;
+      guide.visible = false;
+      viewport.dataset.stroke = 'active';
+      return;
+    }
+    strokeAnimation = null;
+  }
+  viewport.dataset.stroke = '';
+  const available = !cue.pocketed && !ballsMoving(balls);
+  cueStick.visible = available;
+  guide.visible = available;
   if (!available) return;
   // Put the actual tip just behind the white, with a small power-dependent draw-back.
   // 1.34 is the tip's local x coordinate inside the cue-stick model.
@@ -558,7 +627,7 @@ function frame(now) {
     model.visible = !b.pocketed;
     model.position.set(b.x, TABLE.ballRadius + 0.052, b.z);
   }
-  updateCue();
+  updateCue(now);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
