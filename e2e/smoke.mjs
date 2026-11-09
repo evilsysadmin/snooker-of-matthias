@@ -28,6 +28,7 @@ try {
     );
     assert.ok(dimensions.w >= 350 && dimensions.h >= 500, '3D canvas should have dimensions');
     assert.equal(await page.locator('#shots').innerText(), '00');
+    assert.match(await page.locator('#potted').innerText(), /\/ 21/, 'snooker counts 21 object balls');
     const layout = await page.evaluate(() => {
       const rect = (query) => document.querySelector(query).getBoundingClientRect();
       return { viewport: rect('#viewport'), header: rect('.topbar'), controls: rect('.bottom-panel') };
