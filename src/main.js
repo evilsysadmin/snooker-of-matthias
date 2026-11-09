@@ -527,7 +527,13 @@ function updateCue(now) {
     viewport.dataset.aimTarget = String(preview.ballId);
   } else if (preview.jawIndex !== null) {
     // Show a tiny amber mark where the white will first graze the felt jaw.
-    impactDot.position.set(preview.x, TABLE.ballRadius + 0.052, preview.z);
+    const jaw = POCKET_JAWS[preview.jawIndex];
+    const share = jaw.radius / (jaw.radius + TABLE.ballRadius);
+    impactDot.position.set(
+      jaw.x + (preview.x - jaw.x) * share,
+      TABLE.ballRadius + 0.052,
+      jaw.z + (preview.z - jaw.z) * share,
+    );
     impactDot.visible = true;
     viewport.dataset.aimJaw = String(preview.jawIndex);
   }
