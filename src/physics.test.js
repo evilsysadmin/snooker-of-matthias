@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  TABLE, BAULK, COLOUR_SPOTS, POCKETS, POCKET_JAWS, OBJECT_BALL_COUNT, createRack, ballsMoving, stepPhysics, strikeCue, respawnCue,
+  TABLE, BAULK, COLOUR_SPOTS, POCKETS, POCKET_JAWS, OBJECT_BALL_COUNT, createRack, ballsMoving, stepPhysics, strikeCue, respawnCue, canPlaceCueInD,
 } from './physics.js';
 
 test('snooker practice rack has 15 reds, 6 colours and one cue, without overlapping', () => {
@@ -214,6 +214,51 @@ test('scratched cue is restored only once all the other balls stop', () => {
   assert.equal(respawnCue(balls), true);
   assert.equal(cue.pocketed, false);
   assert.equal(cue.vx, 0);
+});
+
+
+test('cue in hand accepts only stationary, vacant points inside the baulk D', () => {
+  const balls = createRack();
+  const cue = balls[0];
+  cue.pocketed = true;
+  assert.equal(canPlaceCueInD(balls, -3, 0), true);
+  assert.equal(canPlaceCueInD(balls, BAULK.x, 0.1), true, 'the line counts as in D');
+  for (const [x, z] of [
+    [BAULK.x + 0.01, 0], [BAULK.x - 0.6, 0.6],
+    [NaN, 0], [Infinity, 0], [0, 0],
+  ]) assert.equal(canPlaceCueInD(balls, x, z), false, 'outside D or nonfinite');
+  balls[1].x = -3;
+  balls[1].z = 0;
+  assert.equal(canPlaceCueInD(balls, -3, 0), false, 'no overlaps');
+  assert.equal(respawnCue(balls, -3, 0), false, 'illegal placement leaves white in hand');
+  assert.equal(cue.pocketed, true);
+  balls[1].vx = 0.2;
+  assert.equal(canPlaceCueInD(balls, -2.9, -0.3), false, 'wait for all balls to stop');
+  balls[1].vx = 0;
+  cue.spinVx = 3;
+  cue.spinVz = -2;
+  assert.equal(respawnCue(balls, -2.9, -0.3), true, 'user chooses valid free point');
+  assert.equal(cue.x, -2.9);
+  assert.equal(cue.z, -0.3);
+  assert.equal(cue.pocketed, false);
+  assert.equal(cue.spinVx, 0);
+  assert.equal(cue.spinVz, 0);
+  assert.equal(respawnCue(balls, -3, 0), false, 'cannot reposition the live white');
+});
+
+test('keyboard fallback finds a legal nonoverlapping D position, or waits', () => {
+  const balls = createRack();
+  const cue = balls[0];
+  cue.pocketed = true;
+  balls[1].x = BAULK.x - 0.45;
+  balls[1].z = 0;
+  balls[1].vx = 1;
+  assert.equal(respawnCue(balls), false, 'never respawn during another shot');
+  balls[1].vx = 0;
+  assert.equal(respawnCue(balls), true);
+  assert.ok(cue.x <= BAULK.x);
+  assert.ok(Math.hypot(cue.x - BAULK.x, cue.z) <= BAULK.radius + 1e-9);
+  assert.ok(Math.hypot(cue.x - balls[1].x, cue.z - balls[1].z) >= 2 * TABLE.ballRadius);
 });
 
 test('physics rejects variable steps that would tunnel through collisions', () => {
