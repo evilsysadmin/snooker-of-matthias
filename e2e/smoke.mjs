@@ -28,7 +28,7 @@ try {
     );
     assert.ok(dimensions.w >= 350 && dimensions.h >= 500, '3D canvas should have dimensions');
     assert.equal(await page.locator('#shots').innerText(), '00');
-    assert.match(await page.locator('#potted').innerText(), /\/ 21/, 'snooker counts 21 object balls');
+    assert.match(await page.locator('#potted').innerText(), /21 en mesa/, 'snooker starts with 21 objects remaining');
     assert.equal(await page.locator('#viewport').getAttribute('data-camera'), 'top');
     assert.equal(await page.locator('#camera-top').getAttribute('aria-pressed'), 'true');
     const layout = await page.evaluate(() => {
@@ -267,6 +267,46 @@ try {
       'moving the white back into D must not count as another shot');
     await page.locator('#restart').click();
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');
+    // Drive a real opening-rack pot: 33 degrees, 70% power pockets yellow.
+    // Physics settles before the coloured ball returns (without losing any reds).
+    const yellowShot = await page.locator('#viewport canvas').evaluate((canvas) => {
+      const rect = canvas.getBoundingClientRect();
+      const aspect = rect.width / rect.height;
+      const portrait = rect.width <= 700 && rect.height > rect.width * 1.15;
+      const halfHeight = Math.max((portrait ? 4.75 : 2.51) / 0.89,
+        (portrait ? 2.51 : 4.75) / (aspect * 0.89));
+      const scale = rect.height / (2 * halfHeight);
+      const x = -2.9 + 2 * Math.cos(33 * Math.PI / 180);
+      const z = 0.38 + 2 * Math.sin(33 * Math.PI / 180);
+      return portrait
+        ? { x: rect.left + rect.width / 2 + z * scale,
+            y: rect.top + rect.height / 2 - x * scale }
+        : { x: rect.left + rect.width / 2 + x * scale,
+            y: rect.top + rect.height / 2 + z * scale };
+    });
+    await page.locator('#power').evaluate((el) => {
+      el.value = '70';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.mouse.move(yellowShot.x, yellowShot.y);
+    if (config.isMobile) await page.locator('#strike').tap();
+    else await page.locator('#strike').click();
+    await page.waitForFunction(() => {
+      const pocketCount = document.querySelector('#potted')?.textContent || '';
+      return pocketCount.trim().startsWith('01') &&
+        pocketCount.includes('21 en mesa') &&
+        !document.querySelector('#strike')?.disabled &&
+        (document.querySelector('#commentary')?.textContent || '').includes('amarilla');
+    }, undefined, { timeout: 20000 });
+    assert.equal(await page.locator('#shots').innerText(), '01');
+    await page.screenshot({
+      path: 'artifacts/snooker-' + config.name + '-yellow-respot.png',
+      fullPage: true, animations: 'disabled',
+    });
+    await page.locator('#restart').click();
+    await page.waitForFunction(() => /^00.*21 en mesa/s.test(
+      document.querySelector('#potted')?.textContent || ''));
+    assert.match(await page.locator('#potted').innerText(), /00.*21 en mesa/s);
     assert.deepEqual(errors, [], config.name + ' browser runtime errors');
     console.log('SNOOKER_BROWSER_' + config.name.toUpperCase() + '_PASS', dimensions);
     await context.close();

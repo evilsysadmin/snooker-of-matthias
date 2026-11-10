@@ -7,6 +7,7 @@ import { createShotCharge } from './shotCharge.js';
 import { predictFirstContact } from './aimPrediction.js';
 import { FINE_AIM_STEP_DEGREES, rotateAim } from './fineAim.js';
 import { resolveStrokePower } from './strokeInteraction.js';
+import { respotPracticeColours, redsOnTable, remainingObjectBalls } from './practiceRules.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -19,7 +20,7 @@ app.innerHTML = [
     '<div class="scoreboard" aria-live="polite">',
       '<div><span>TIROS</span><strong id="shots">00</strong></div>',
       '<div class="score-divider"></div>',
-      '<div><span>EMBOCADAS</span><strong id="potted">00 <small>/ ' + OBJECT_BALL_COUNT + '</small></strong></div>',
+      '<div><span>EMBOCADAS</span><strong id="potted">00 <small>· ' + OBJECT_BALL_COUNT + ' en mesa</small></strong></div>',
     '</div>',
   '</header>',
   '<div class="table-label"><span class="table-label-dot"></span> SNOOKER · PRÁCTICA LIBRE · 3D ALPHA</div>',
@@ -311,6 +312,7 @@ let placementCandidate = null;
 let placementPointerId = null;
 let wasPlacementMode = false;
 let dirtyHUD = true;
+let redPhaseAnnounced = false;
 let fineAimSteps = 0;
 let cueSpin = 0; // -1: draw, 0: centre, +1: follow
 let pointerStroke = null;
@@ -354,7 +356,8 @@ updateSpinButton();
 function say(message) { commentary.textContent = message; }
 function formatScore() {
   shotDisplay.textContent = String(shots).padStart(2, '0');
-  pocketDisplay.innerHTML = String(potted).padStart(2, '0') + ' <small>/ ' + OBJECT_BALL_COUNT + '</small>';
+  pocketDisplay.innerHTML = String(potted).padStart(2, '0') +
+    ' <small>· ' + remainingObjectBalls(balls) + ' en mesa</small>';
 }
 function restart() {
   cancelCharge();
@@ -362,6 +365,7 @@ function restart() {
   balls = createRack();
   shots = 0;
   potted = 0;
+  redPhaseAnnounced = false;
   scratchPending = false;
   placementPrompted = false;
   placementCandidate = null;
@@ -703,11 +707,32 @@ function frame(now) {
     accumulator -= FIXED_DT;
   }
   if (!ballsMoving(balls)) {
+    // This is a shot-end practice rule, not a physics collision. Restore only
+    // now, never while another ball is rolling or the white is in flight.
+    const returned = respotPracticeColours(balls);
+    if (returned.length) {
+      dirtyHUD = true;
+      if (!scratchPending) {
+        const names = { 16: 'amarilla', 17: 'verde', 18: 'marrón',
+          19: 'azul', 20: 'rosa', 21: 'negra' };
+        say(returned.length === 1
+          ? 'Matthias: La ' + names[returned[0].id] +
+            ' vuelve a su marca. Todavía quedan rojas, por desgracia.'
+          : 'Matthias: ' + returned.length +
+            ' colores recolocados. El tapete no se limpia solo.');
+      }
+    }
+    if (!redsOnTable(balls) && !redPhaseAnnounced) {
+      redPhaseAnnounced = true;
+      if (!scratchPending && wasMoving) {
+        say('Matthias: Última roja fuera. Ahora los colores ya no regresan.');
+      }
+    }
     if (scratchPending && !placementPrompted) {
       placementPrompted = true;
       say('Matthias: Blanca en mano. Toca un hueco libre dentro de la D, o pulsa COLOCAR.');
     }
-    if (wasMoving && !scratchPending && potted === OBJECT_BALL_COUNT) {
+    if (wasMoving && !scratchPending && remainingObjectBalls(balls) === 0) {
       say('Matthias: Todas dentro. Me veo obligado, muy a mi pesar, a felicitarte.');
     }
   }
