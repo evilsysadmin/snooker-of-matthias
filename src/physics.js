@@ -240,17 +240,35 @@ function capturePocket(ball, events) {
   return false;
 }
 
-export function respawnCue(balls) {
+// A scratched white is in hand: its CENTRE must lie in the baulk D,
+// away from all other balls. Keep this rule independent of Three.js/input.
+export function canPlaceCueInD(balls, x, z) {
   const cue = balls.find((b) => b.id === 0);
-  if (!cue || !cue.pocketed || ballsMoving(balls)) return false;
-  // Find a vacant point behind the baulk line rather than overlapping balls.
-  for (let x = -2.55; x >= -3.8; x -= 0.3) {
-    for (const z of [0, -0.38, 0.38, -0.76, 0.76, -1.14, 1.14]) {
-      if (balls.every((b) => b.id === 0 || b.pocketed ||
-        Math.hypot(b.x - x, b.z - z) > 2 * TABLE.ballRadius + 0.02)) {
-        Object.assign(cue, { x, z, vx: 0, vz: 0, spinVx: 0, spinVz: 0, pocketed: false });
-        return true;
-      }
+  if (!cue?.pocketed || ballsMoving(balls) ||
+      !Number.isFinite(x) || !Number.isFinite(z)) return false;
+  if (x > BAULK.x + 1e-9 ||
+      Math.hypot(x - BAULK.x, z) > BAULK.radius + 1e-9) return false;
+  if (Math.abs(x) > TABLE.halfX - TABLE.ballRadius ||
+      Math.abs(z) > TABLE.halfZ - TABLE.ballRadius) return false;
+  return balls.every((b) => b.id === 0 || b.pocketed ||
+    Math.hypot(b.x - x, b.z - z) >= 2 * TABLE.ballRadius + 0.004);
+}
+
+// Explicit x/z places the white exactly where the player chooses.
+// Without coordinates, choose a legal point inside D for keyboard users.
+export function respawnCue(balls, x, z) {
+  const cue = balls.find((b) => b.id === 0);
+  if (!cue) return false;
+  const put = (px, pz) => {
+    if (!canPlaceCueInD(balls, px, pz)) return false;
+    Object.assign(cue, { x: px, z: pz, vx: 0, vz: 0,
+      spinVx: 0, spinVz: 0, pocketed: false });
+    return true;
+  };
+  if (x !== undefined || z !== undefined) return put(x, z);
+  for (const offset of [0.45, 0.3, 0.15, 0.6, 0]) {
+    for (const zz of [0, 0.2, -0.2, 0.4, -0.4, 0.6, -0.6]) {
+      if (put(BAULK.x - offset, zz)) return true;
     }
   }
   return false;
