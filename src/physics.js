@@ -53,7 +53,7 @@ export const POCKET_JAWS = Object.freeze(POCKETS.flatMap(([px, pz]) => {
 }));
 
 // The cloth markings and opening rack use the same physical spots.
-// White marks are cosmetic only; coloured-ball respotting is not yet implemented.
+// Colour respotting is handled by the separate free-practice shot-end policy.
 export const BAULK = Object.freeze({ x: -2.55, radius: 0.71 });
 export const COLOUR_SPOTS = Object.freeze([
   Object.freeze({ id: 16, x: BAULK.x, z: BAULK.radius }),  // Yellow
