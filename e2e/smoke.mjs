@@ -221,7 +221,10 @@ try {
         : { x: rect.left + rect.width / 2 + x * scale,
             y: rect.top + rect.height / 2 + z * scale };
       return {
-        pocket: screen(-4.33, 2.15),
+        // 128° from the initial white: verified against the real 120 Hz engine
+        // to scratch consistently without being rejected by a pocket jaw.
+        pocket: screen(-2.9 + 2 * Math.cos(128 * Math.PI / 180),
+          0.38 + 2 * Math.sin(128 * Math.PI / 180)),
         outside: screen(-2.05, 0),
         occupied: screen(-2.55, 0),
         inside: screen(-3.0, 0),
