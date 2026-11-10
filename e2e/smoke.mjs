@@ -304,6 +304,8 @@ try {
       fullPage: true, animations: 'disabled',
     });
     await page.locator('#restart').click();
+    await page.waitForFunction(() => /^00.*21 en mesa/s.test(
+      document.querySelector('#potted')?.textContent || ''));
     assert.match(await page.locator('#potted').innerText(), /00.*21 en mesa/s);
     assert.deepEqual(errors, [], config.name + ' browser runtime errors');
     console.log('SNOOKER_BROWSER_' + config.name.toUpperCase() + '_PASS', dimensions);
