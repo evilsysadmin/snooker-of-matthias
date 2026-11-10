@@ -230,6 +230,13 @@ try {
         inside: screen(-3.0, 0),
       };
     });
+    // Prior charge tests intentionally leave the slider at another value.
+    // Reset this scenario's shot power: its 128° scratch is calibrated to 55%.
+    await page.locator('#power').evaluate((el) => {
+      el.value = '55';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    assert.equal(await page.locator('#power-value').innerText(), '55%');
     await page.mouse.move(dScreens.pocket.x, dScreens.pocket.y);
     if (config.isMobile) await page.locator('#strike').tap();
     else await page.locator('#strike').click();
