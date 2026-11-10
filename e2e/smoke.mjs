@@ -206,6 +206,57 @@ try {
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
     await page.locator('#restart').click();
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');
+    // The real rendered table must let a scratched white be placed inside D
+    // with desktop pointer or mobile touch, never on top of another ball.
+    const dScreens = await page.locator('#viewport canvas').evaluate((canvas) => {
+      const rect = canvas.getBoundingClientRect();
+      const aspect = rect.width / rect.height;
+      const portrait = rect.width <= 700 && rect.height > rect.width * 1.15;
+      const halfHeight = Math.max((portrait ? 4.75 : 2.51) / 0.89,
+        (portrait ? 2.51 : 4.75) / (aspect * 0.89));
+      const scale = rect.height / (2 * halfHeight);
+      const screen = (x, z) => portrait
+        ? { x: rect.left + rect.width / 2 + z * scale,
+            y: rect.top + rect.height / 2 - x * scale }
+        : { x: rect.left + rect.width / 2 + x * scale,
+            y: rect.top + rect.height / 2 + z * scale };
+      return {
+        pocket: screen(-4.33, 2.15),
+        outside: screen(-2.05, 0),
+        occupied: screen(-2.55, 0),
+        inside: screen(-3.0, 0),
+      };
+    });
+    await page.mouse.move(dScreens.pocket.x, dScreens.pocket.y);
+    if (config.isMobile) await page.locator('#strike').tap();
+    else await page.locator('#strike').click();
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.cuePlacement === 'required',
+      undefined, { timeout: 15000 });
+    await page.waitForFunction(() => !document.querySelector('#strike')?.disabled,
+      undefined, { timeout: 15000 });
+    assert.match(await page.locator('#strike').innerText(), /COLOCAR/,
+      'scratch changes shot control to accessible cue placement');
+    const touchOrClick = async (p) => {
+      if (config.isMobile) await page.touchscreen.tap(p.x, p.y);
+      else await page.mouse.click(p.x, p.y);
+    };
+    await touchOrClick(dScreens.outside);
+    assert.equal(await page.locator('#viewport').getAttribute('data-cue-placement'), 'required',
+      'cannot place outside the D');
+    await touchOrClick(dScreens.occupied);
+    assert.equal(await page.locator('#viewport').getAttribute('data-cue-placement'), 'required',
+      'cannot overlap the brown ball');
+    await page.screenshot({
+      path: 'artifacts/snooker-' + config.name + '-cue-in-hand.png', fullPage: true,
+      animations: 'disabled',
+    });
+    await touchOrClick(dScreens.inside);
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.cuePlacement === '');
+    assert.match(await page.locator('#strike').innerText(), /GOLPEAR/);
+    assert.equal(await page.locator('#shots').innerText(), '01',
+      'moving the white back into D must not count as another shot');
+    await page.locator('#restart').click();
+    await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');
     assert.deepEqual(errors, [], config.name + ' browser runtime errors');
     console.log('SNOOKER_BROWSER_' + config.name.toUpperCase() + '_PASS', dimensions);
     await context.close();
