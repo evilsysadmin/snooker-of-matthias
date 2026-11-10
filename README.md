@@ -12,7 +12,7 @@ A deliberately small but **playable 3D snooker** experiment for the ShadowOps fa
 - On narrow/mobile screens use the **↶ / ↷ 0,5°** fine-aim buttons below shot power for sub-degree corrections; tapping the table resets the displayed correction baseline.
 - **Tactile cue stroke** on desktop and mobile: tap **GOLPEAR** to shoot with the selected slider power, or hold it to charge a visible rising/falling strength and release to strike. The cue draws back during charge and briefly animates its tip on release. Drag off the strike button to cancel instead of firing. SPACE offers the same hold-to-charge behavior, while focused buttons retain normal keyboard activation.
 - The compact **● Centro → ↑ Sigue → ↓ Retro** button cycles cue-ball strike effects. Follow/draw change actual cue motion via a deterministic, bounded cloth-traction approximation after contact; not a full angular-velocity model. The first-contact aiming guide does not predict post-impact spin paths.
-- Fixed-step deterministic collision, cushions, friction, pocket capture, white-ball scratch/respawn.
+- Fixed-step deterministic collision, cushions, friction and pocket capture. After a scratch, wait for all balls to stop, then touch/drag the white to a legal unoccupied spot inside the baulk D; the temporary **COLOCAR** control picks a legal D spot for keyboard access. The game rejects placements outside D and overlapping balls.
 - Shot and pocket counters, reset, mobile-friendly interface and occasional Matthias snark.
 - **Free practice only**: authentic snooker layout and colours, but no official snooker turn/scoring/respotted-colour rules, AI, **side spin (English)** or multiplayer yet. Follow/draw is an initial simplified simulation, not a calibrated real-world snooker model.
 
