@@ -222,7 +222,7 @@ test('cue in hand accepts only stationary, vacant points inside the baulk D', ()
   const cue = balls[0];
   cue.pocketed = true;
   assert.equal(canPlaceCueInD(balls, -3, 0), true);
-  assert.equal(canPlaceCueInD(balls, BAULK.x, 0.1), true, 'the line counts as in D');
+  assert.equal(canPlaceCueInD(balls, BAULK.x, -0.25), true, 'the line counts as in D when clear of brown');
   for (const [x, z] of [
     [BAULK.x + 0.01, 0], [BAULK.x - 0.6, 0.6],
     [NaN, 0], [Infinity, 0], [0, 0],
