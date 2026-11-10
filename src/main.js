@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  TABLE, POCKETS, POCKET_JAWS, BAULK, COLOUR_SPOTS, OBJECT_BALL_COUNT, createRack, strikeCue, stepPhysics, ballsMoving, respawnCue,
+  TABLE, POCKETS, POCKET_JAWS, BAULK, COLOUR_SPOTS, OBJECT_BALL_COUNT, createRack, strikeCue, stepPhysics, ballsMoving, respawnCue, canPlaceCueInD,
 } from './physics.js';
 import './styles.css';
 import { createShotCharge } from './shotCharge.js';
@@ -206,6 +206,9 @@ const dArc = new THREE.Mesh(
   clothInk,
 );
 scene.add(dArc);
+const placementInk = clothInk.clone();
+placementInk.color.setHex(0xe1c388);
+placementInk.opacity = 0.96;
 const spotGeometry = new THREE.CircleGeometry(0.026, 24);
 const spotMaterial = new THREE.MeshBasicMaterial({
   color: 0xf2ead6, transparent: true, opacity: 0.70, depthWrite: false,
@@ -287,6 +290,14 @@ const impactDot = new THREE.Mesh(
 impactDot.renderOrder = 4;
 impactDot.visible = false;
 scene.add(impactDot);
+const placementGhost = new THREE.Mesh(
+  new THREE.SphereGeometry(TABLE.ballRadius, 24, 16),
+  new THREE.MeshBasicMaterial({ color: 0xf6e8be, transparent: true, opacity: 0.52,
+    depthWrite: false, depthTest: false }),
+);
+placementGhost.renderOrder = 5;
+placementGhost.visible = false;
+scene.add(placementGhost);
 const cueDirection = new THREE.Vector3(1, 0, 0);
 
 let balls = createRack();
@@ -295,6 +306,10 @@ let potted = 0;
 let dragging = false;
 let wasMoving = false;
 let scratchPending = false;
+let placementPrompted = false;
+let placementCandidate = null;
+let placementPointerId = null;
+let wasPlacementMode = false;
 let dirtyHUD = true;
 let fineAimSteps = 0;
 let cueSpin = 0; // -1: draw, 0: centre, +1: follow
@@ -348,6 +363,9 @@ function restart() {
   shots = 0;
   potted = 0;
   scratchPending = false;
+  placementPrompted = false;
+  placementCandidate = null;
+  placementPointerId = null;
   wasMoving = false;
   dirtyHUD = true;
   fineAimSteps = 0;
@@ -355,6 +373,14 @@ function restart() {
   cueSpin = 0;
   updateSpinButton();
   say('Matthias: Otra oportunidad de desafiar a la geometría. Adelante, campeón.');
+}
+function placeWhiteInD(x, z) {
+  if (!scratchPending || !respawnCue(balls, x, z)) return false;
+  scratchPending = false;
+  placementPrompted = false;
+  placementCandidate = null;
+  say('Matthias: Blanca colocada. Ahora intenta no volver a perderla.');
+  return true;
 }
 function shoot(power = Number(powerInput.value) / 100) {
   const cue = balls[0];
@@ -373,6 +399,7 @@ function shoot(power = Number(powerInput.value) / 100) {
 // fires with the chosen slider power; holding makes the stroke tactile on touch.
 strikeButton.addEventListener('pointerdown', (event) => {
   if (event.button !== 0 || strikeButton.disabled || charge.active) return;
+  if (scratchPending) { placeWhiteInD(); return; }
   const now = performance.now();
   if (!charge.start(now)) return;
   pointerStroke = { id: event.pointerId, started: now, preset: Number(powerInput.value) / 100 };
@@ -403,7 +430,10 @@ strikeButton.addEventListener('lostpointercapture', () => {
 // Keyboard and accessibility activation produce click(detail=0), not a
 // pointer release; never fire twice after a mouse/touch pointerup.
 strikeButton.addEventListener('click', (event) => {
-  if (event.detail === 0) shoot();
+  if (event.detail === 0) {
+    if (scratchPending) placeWhiteInD();
+    else shoot();
+  }
 });
 strikeButton.addEventListener('contextmenu', (event) => event.preventDefault());
 restartButton.addEventListener('click', restart);
@@ -457,13 +487,20 @@ const ray = new THREE.Raycaster();
 const clothPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -TABLE.ballRadius);
 const pointer = new THREE.Vector2();
 const point = new THREE.Vector3();
-function pointAim(event) {
-  if (ballsMoving(balls) || balls[0].pocketed) return;
+function pointAim(event, commitPlacement = false) {
+  if (ballsMoving(balls)) return;
   const rect = renderer.domElement.getBoundingClientRect();
   pointer.set((event.clientX - rect.left) / rect.width * 2 - 1,
     -(event.clientY - rect.top) / rect.height * 2 + 1);
   ray.setFromCamera(pointer, camera);
   if (!ray.ray.intersectPlane(clothPlane, point)) return;
+  if (scratchPending) {
+    const valid = canPlaceCueInD(balls, point.x, point.z);
+    placementCandidate = { x: point.x, z: point.z, valid };
+    if (commitPlacement && valid) placeWhiteInD(point.x, point.z);
+    return;
+  }
+  if (balls[0].pocketed) return;
   const dx = point.x - balls[0].x;
   const dz = point.z - balls[0].z;
   if (Math.hypot(dx, dz) < TABLE.ballRadius * 2) return;
@@ -476,19 +513,37 @@ const canvas = renderer.domElement;
 canvas.style.touchAction = 'none';
 canvas.addEventListener('pointerdown', (event) => {
   dragging = true;
+  if (scratchPending) placementPointerId = event.pointerId;
   canvas.setPointerCapture(event.pointerId);
-  pointAim(event);
+  pointAim(event, scratchPending);
 });
 canvas.addEventListener('pointermove', (event) => {
+  // Do not accidentally re-aim while the finger that placed the white is held.
+  if (placementPointerId !== null && !scratchPending) return;
   if (event.pointerType === 'mouse' || dragging) pointAim(event);
 });
-canvas.addEventListener('pointerup', () => { dragging = false; });
-canvas.addEventListener('pointercancel', () => { dragging = false; });
+canvas.addEventListener('pointerup', (event) => {
+  if (placementPointerId === event.pointerId) {
+    if (scratchPending) pointAim(event, true);
+    placementPointerId = null;
+  }
+  dragging = false;
+});
+canvas.addEventListener('pointercancel', () => {
+  dragging = false;
+  placementPointerId = null;
+});
 
 function updateCue(now) {
   const cue = balls[0];
   ghostRing.visible = false;
   impactDot.visible = false;
+  placementGhost.visible = scratchPending && !ballsMoving(balls) && Boolean(placementCandidate);
+  dArc.material = scratchPending ? placementInk : clothInk;
+  if (placementGhost.visible) {
+    placementGhost.position.set(placementCandidate.x, TABLE.ballRadius + 0.052, placementCandidate.z);
+    placementGhost.material.color.setHex(placementCandidate.valid ? 0xf6e8be : 0xe86464);
+  }
   viewport.dataset.aimTarget = '';
   viewport.dataset.aimJaw = '';
   // Animate a short, bounded cue-tip strike before hiding the stick during roll.
@@ -636,7 +691,9 @@ function frame(now) {
     for (const event of events) {
       if (event.type === 'scratch') {
         scratchPending = true;
-        say('Matthias: Has metido la blanca. Wunderbar. No es precisamente el objetivo.');
+        placementPrompted = false;
+        placementCandidate = null;
+        say('Matthias: Has metido la blanca. Wunderbar. Espera a que se detengan las bolas.');
       } else {
         potted++;
         dirtyHUD = true;
@@ -646,17 +703,32 @@ function frame(now) {
     accumulator -= FIXED_DT;
   }
   if (!ballsMoving(balls)) {
-    if (scratchPending && respawnCue(balls)) scratchPending = false;
+    if (scratchPending && !placementPrompted) {
+      placementPrompted = true;
+      say('Matthias: Blanca en mano. Toca un hueco libre dentro de la D, o pulsa COLOCAR.');
+    }
     if (wasMoving && !scratchPending && potted === OBJECT_BALL_COUNT) {
       say('Matthias: Todas dentro. Me veo obligado, muy a mi pesar, a felicitarte.');
     }
   }
   wasMoving = ballsMoving(balls);
   if (dirtyHUD) { formatScore(); dirtyHUD = false; }
-  strikeButton.disabled = wasMoving || balls[0].pocketed;
-  spinButton.disabled = strikeButton.disabled;
-  fineLeft.disabled = strikeButton.disabled;
-  fineRight.disabled = strikeButton.disabled;
+  if (scratchPending !== wasPlacementMode) {
+    wasPlacementMode = scratchPending;
+    strikeButton.innerHTML = scratchPending
+      ? '<span>◌</span> COLOCAR'
+      : '<span>⚡</span> GOLPEAR <kbd>ESPACIO</kbd>';
+    const aria = scratchPending
+      ? 'Colocar blanca automáticamente en un punto libre de la D'
+      : 'Golpear: toca para usar la potencia elegida, mantén pulsado para cargar';
+    strikeButton.setAttribute('aria-label', aria);
+    strikeButton.title = aria;
+  }
+  viewport.dataset.cuePlacement = scratchPending ? 'required' : '';
+  strikeButton.disabled = wasMoving || (balls[0].pocketed && !scratchPending);
+  spinButton.disabled = wasMoving || balls[0].pocketed;
+  fineLeft.disabled = spinButton.disabled;
+  fineRight.disabled = spinButton.disabled;
   for (const b of balls) {
     const model = models.get(b.id);
     model.visible = !b.pocketed;
