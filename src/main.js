@@ -5,6 +5,7 @@ import {
 import './styles.css';
 import { createShotCharge } from './shotCharge.js';
 import { cueIdleGap, cueStrokePose, CUE_TIP_LOCAL_X } from './cueMotion.js';
+import { createCueStick } from './cueVisuals.js';
 import { predictFirstContact } from './aimPrediction.js';
 import { FINE_AIM_STEP_DEGREES, rotateAim } from './fineAim.js';
 import { resolveStrokePower } from './strokeInteraction.js';
@@ -392,21 +393,9 @@ const models = new Map();
 for (let number = 0; number <= OBJECT_BALL_COUNT; number++) models.set(number, ballModel(number));
 
 const aim = new THREE.Vector3(1, 0, 0);
-const cueMaterial = new THREE.MeshStandardMaterial({ color: 0xd7a465, roughness: 0.42 });
-const gripMaterial = new THREE.MeshStandardMaterial({ color: 0x43241d, roughness: 0.36 });
-const tipMaterial = new THREE.MeshStandardMaterial({ color: 0x7ebfc0, roughness: 0.6 });
-const cueStick = new THREE.Group();
-const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.020, 0.057, 2.65, 14), cueMaterial);
-shaft.rotation.z = Math.PI / 2;
-cueStick.add(shaft);
-const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.059, 0.061, 0.77, 14), gripMaterial);
-grip.rotation.z = Math.PI / 2;
-grip.position.x = -1.05;
-cueStick.add(grip);
-const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.023, 0.023, 0.06, 12), tipMaterial);
-tip.rotation.z = Math.PI / 2;
-tip.position.x = CUE_TIP_LOCAL_X;
-cueStick.add(tip);
+// Self-contained 3D cue: maple taper, leather grip, ferrule and restrained trim.
+// Its tip is still positioned by cueMotion; rendering never affects physics.
+const cueStick = createCueStick(THREE);
 scene.add(cueStick);
 const guide = new THREE.Line(
   new THREE.BufferGeometry().setFromPoints([
