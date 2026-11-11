@@ -9,6 +9,7 @@ import { FINE_AIM_STEP_DEGREES, rotateAim } from './fineAim.js';
 import { resolveStrokePower } from './strokeInteraction.js';
 import { remainingObjectBalls } from './practiceRules.js';
 import { createVersionWatcher } from './versionNotice.js';
+import { newEightBallMatch, adjudicateEightBallShot, groupForBall } from './eightBallRules.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -18,13 +19,18 @@ app.innerHTML = [
     '<div class="brand"><span class="brand-icon">✦</span><div class="brand-copy">',
       '<small>SHADOWOPS PRESENTA</small><strong>BILLIARDS <em>OF</em> MATTHIAS</strong>',
     '</div></div>',
-    '<div class="scoreboard" aria-live="polite">',
+    '<div class="mode-switch" role="group" aria-label="Modalidad de billar">',
+      '<button id="mode-practice" type="button" aria-pressed="true" title="Práctica libre; cambiar reinicia la mesa">Práctica</button>',
+      '<button id="mode-versus" type="button" aria-pressed="false" title="Partida local para dos jugadores; cambiar reinicia la mesa">2 jugadores</button>',
+    '</div>',
+    '<div class="scoreboard" aria-live="polite">
       '<div><span>TIROS</span><strong id="shots">00</strong></div>',
       '<div class="score-divider"></div>',
       '<div><span>EMBOCADAS</span><strong id="potted">00 <small>· ' + OBJECT_BALL_COUNT + ' en mesa</small></strong></div>',
     '</div>',
   '</header>',
   '<div class="table-label"><span class="table-label-dot"></span> POOL 8-BALL · PRÁCTICA LIBRE · 3D ALPHA</div>',
+  '<div id="match-status" class="match-status" role="status" aria-live="polite" hidden></div>',
   '<aside id="update-banner" class="update-banner" role="status" hidden>',
     '<div class="update-copy"><strong>🎱 Nueva versión disponible</strong>',
       '<div>Actualizar reinicia la mesa actual.</div></div>',
@@ -40,13 +46,24 @@ app.innerHTML = [
     '<small>MATTHIAS · CRÍTICO DE PRECISIÓN</small>',
     '<p id="commentary" role="status">Guten Abend. Apunta sobre la mesa, elige potencia y golpea. Procura no humillarte.</p>',
     '</div></div>',
-    '<div class="shot-controls">',
+    '<div class="shot-controls">
       '<div class="power"><div class="power-heading"><span>POTENCIA</span><output id="power-value" for="power">55%</output></div>',
       '<input id="power" type="range" min="0" max="100" value="55" aria-label="Potencia del golpe" /></div>',
       '<button id="spin-cycle" class="spin-cycle" type="button" data-spin="0" aria-label="Efecto de la blanca: centro. Pulsa para cambiar" title="Efecto de la blanca: centro · pulsa para cambiar">● Centro</button>',
       '<button id="strike" class="strike" type="button" aria-label="Golpear: toca para usar la potencia elegida, mantén pulsado para cargar" title="Toca para golpear · mantén pulsado para cargar"><span>⚡</span> GOLPEAR <kbd>ESPACIO</kbd></button>',
       '<button id="restart" class="restart" type="button" title="Recolocar las bolas" aria-label="Reiniciar partida">↺</button>',
     '</div>',
+    '<label id="pocket-call-wrap" class="pocket-call" hidden>Tronera de la negra',
+      '<select id="pocket-call" aria-label="Anunciar tronera para la bola ocho">',
+        '<option value="">Elige tronera…</option>',
+        '<option value="0">↖ Esquina superior izquierda</option>',
+        '<option value="1">↑ Centro superior</option>',
+        '<option value="2">↗ Esquina superior derecha</option>',
+        '<option value="3">↙ Esquina inferior izquierda</option>',
+        '<option value="4">↓ Centro inferior</option>',
+        '<option value="5">↘ Esquina inferior derecha</option>',
+      '</select>',
+    '</label>',
     '<p class="hint">Apunta en la mesa. Toca GOLPEAR o mantén para cargar; suelta para tirar. ESPACIO también carga. R reinicia.</p>',
     '<div class="fine-aim" role="group" aria-label="Ajuste fino de puntería">',
       '<button id="fine-left" class="fine-step" type="button" aria-label="Girar puntería 0,5 grados a la izquierda">↶ <span>0,5°</span></button>',
@@ -73,6 +90,12 @@ const fineLeft = document.querySelector('#fine-left');
 const fineRight = document.querySelector('#fine-right');
 const fineAngle = document.querySelector('#fine-angle');
 const charge = createShotCharge();
+const modePractice = document.querySelector('#mode-practice');
+const modeVersus = document.querySelector('#mode-versus');
+const matchStatus = document.querySelector('#match-status');
+const tableLabel = document.querySelector('.table-label');
+const pocketCallWrap = document.querySelector('#pocket-call-wrap');
+const pocketCall = document.querySelector('#pocket-call');
 const updateBanner = document.querySelector('#update-banner');
 const updateNow = document.querySelector('#update-now');
 const updateLater = document.querySelector('#update-later');
@@ -358,6 +381,11 @@ let fineAimSteps = 0;
 let cueSpin = 0; // -1: draw, 0: centre, +1: follow
 let pointerStroke = null;
 let strokeAnimation = null;
+let mode = 'practice'; // Opt in to local rules; current practice never changes.
+let match = newEightBallMatch();
+let shotEvents = [];
+let ballsBeforeShot = null;
+let announcedPocket = null;
 let availableUpdate = false;
 const versionWatcher = createVersionWatcher({
   isVisible: () => !document.hidden,
@@ -416,6 +444,44 @@ spinButton.addEventListener('click', () => {
 updateSpinButton();
 
 function say(message) { commentary.textContent = message; }
+
+function needsPocketCall() {
+  if (mode !== 'versus' || match.winner !== null || match.breakShot ||
+      match.groups[match.player] === null) return false;
+  const mine = match.groups[match.player];
+  return balls.every((ball) => ball.pocketed || groupForBall(ball.id) !== mine);
+}
+function syncMatchUI() {
+  const two = mode === 'versus';
+  modePractice.setAttribute('aria-pressed', String(!two));
+  modeVersus.setAttribute('aria-pressed', String(two));
+  matchStatus.hidden = !two;
+  tableLabel.hidden = two;
+  pocketCallWrap.hidden = !needsPocketCall();
+  const group = match.groups[match.player];
+  const type = group === null ? 'Mesa abierta' : group === 'solids' ? 'Lisas' : 'Rayadas';
+  const text = match.winner !== null ? '🏆 Jugador ' + (match.winner + 1) + ' gana'
+    : 'Jugador ' + (match.player + 1) + ' · ' + (match.breakShot ? 'Saque' : type);
+  matchStatus.textContent = text;
+  matchStatus.dataset.turn = String(match.player + 1);
+  matchStatus.dataset.shots = String(match.shots);
+  matchStatus.dataset.winner = match.winner === null ? '' : String(match.winner + 1);
+  if (two) viewport.dataset.gameMode = 'versus';
+  else viewport.dataset.gameMode = 'practice';
+}
+function changeMode(next) {
+  if (mode === next || ballsMoving(balls) || charge.active) return;
+  mode = next;
+  restart();
+  say(next === 'versus'
+    ? 'Matthias: Dos jugadores, un tapete. Saque del jugador 1. Aquí las faltas cuentan.'
+    : 'Matthias: Práctica libre. Aquí puedes seguir haciendo el ridículo a tu ritmo.');
+}
+modePractice.addEventListener('click', () => changeMode('practice'));
+modeVersus.addEventListener('click', () => changeMode('versus'));
+pocketCall.addEventListener('change', () => {
+  announcedPocket = pocketCall.value === '' ? null : Number(pocketCall.value);
+});
 function formatScore() {
   shotDisplay.textContent = String(shots).padStart(2, '0');
   pocketDisplay.innerHTML = String(potted).padStart(2, '0') +
@@ -425,6 +491,11 @@ function restart() {
   cancelCharge();
   strokeAnimation = null;
   balls = createRack();
+  match = newEightBallMatch();
+  shotEvents = [];
+  ballsBeforeShot = null;
+  announcedPocket = null;
+  pocketCall.value = '';
   shots = 0;
   potted = 0;
   scratchPending = false;
@@ -437,6 +508,7 @@ function restart() {
   setFineAngleDisplay();
   cueSpin = 0;
   updateSpinButton();
+  syncMatchUI();
   say('Matthias: Otra oportunidad de desafiar a la geometría. Adelante, campeón.');
 }
 function placeWhiteInHand(x, z) {
@@ -448,9 +520,15 @@ function placeWhiteInHand(x, z) {
   return true;
 }
 function shoot(power = Number(powerInput.value) / 100) {
+  if (mode === 'versus' && (match.winner !== null || (needsPocketCall() && announcedPocket === null))) return;
   const cue = balls[0];
   const shotPosition = { x: cue.x, z: cue.z, dx: aim.x, dz: aim.z };
+  const before = balls.map((ball) => ({ id: ball.id, pocketed: ball.pocketed }));
   if (strikeCue(balls, aim.x, aim.z, power, cueSpin)) {
+    if (mode === 'versus') {
+      ballsBeforeShot = before;
+      shotEvents = [];
+    }
     strokeAnimation = { ...shotPosition, at: performance.now(), power };
     shots++;
     dirtyHUD = true;
@@ -751,14 +829,15 @@ function frame(now) {
   accumulator += elapsed;
   let n = 0;
   while (accumulator >= FIXED_DT && n++ < 7) {
-    const events = stepPhysics(balls, FIXED_DT);
+    const events = stepPhysics(balls, FIXED_DT, { trackContacts: mode === 'versus' });
+    if (mode === 'versus' && ballsBeforeShot) shotEvents.push(...events);
     for (const event of events) {
       if (event.type === 'scratch') {
         scratchPending = true;
         placementPrompted = false;
         placementCandidate = null;
         say('Matthias: Has metido la blanca. Wunderbar. Espera a que se detengan las bolas.');
-      } else {
+      } else if (event.type === 'potted') {
         potted++;
         dirtyHUD = true;
         say('Matthias: Una bola embocada. Debe de haber sido accidental.');
@@ -766,17 +845,49 @@ function frame(now) {
     }
     accumulator -= FIXED_DT;
   }
-  if (!ballsMoving(balls)) {
+  const nowMoving = ballsMoving(balls);
+  if (!nowMoving && wasMoving && mode === 'versus' && ballsBeforeShot) {
+    match = adjudicateEightBallShot(match, ballsBeforeShot, shotEvents,
+      { calledPocket: announcedPocket });
+    ballsBeforeShot = null;
+    shotEvents = [];
+    announcedPocket = null;
+    pocketCall.value = '';
+    if (match.rerack) {
+      balls = createRack();
+      potted = 0;
+      scratchPending = false;
+      placementPrompted = false;
+    } else if (match.last.kind === 'foul') {
+      // The referee awards ball-in-hand even when the white was not potted.
+      // Reuse the existing collision-safe placement flow.
+      balls[0].pocketed = true;
+      balls[0].vx = 0; balls[0].vz = 0;
+      balls[0].spinVx = 0; balls[0].spinVz = 0;
+      scratchPending = true;
+      placementPrompted = false;
+    } else {
+      scratchPending = false;
+    }
+    say('Matthias: ' + match.last.reason + '.');
+    syncMatchUI();
+    dirtyHUD = true;
+  }
+  if (!nowMoving) {
     // Pool object balls stay pocketed; no snooker colour respotting.
     if (scratchPending && !placementPrompted) {
       placementPrompted = true;
-      say('Matthias: Blanca en mano. Elige un hueco libre en la mesa, o pulsa COLOCAR.');
+      say('Matthias: ' + (mode === 'versus'
+        ? 'Falta: jugador ' + (match.player + 1) + ', blanca en mano.'
+        : 'Blanca en mano. Elige un hueco libre en la mesa, o pulsa COLOCAR.'));
     }
-    if (wasMoving && !scratchPending && remainingObjectBalls(balls) === 0) {
+    if (wasMoving && mode === 'practice' && !scratchPending && remainingObjectBalls(balls) === 0) {
       say('Matthias: Todas dentro. Me veo obligado, muy a mi pesar, a felicitarte.');
     }
   }
-  wasMoving = ballsMoving(balls);
+  wasMoving = nowMoving;
+  modePractice.disabled = nowMoving || charge.active;
+  modeVersus.disabled = nowMoving || charge.active;
   if (availableUpdate && !wasMoving) updateBanner.hidden = false;
   if (dirtyHUD) { formatScore(); dirtyHUD = false; }
   if (scratchPending !== wasPlacementMode) {
@@ -791,7 +902,9 @@ function frame(now) {
     strikeButton.title = aria;
   }
   viewport.dataset.cuePlacement = scratchPending ? 'required' : '';
-  strikeButton.disabled = wasMoving || (balls[0].pocketed && !scratchPending);
+  strikeButton.disabled = wasMoving || (balls[0].pocketed && !scratchPending) ||
+    (mode === 'versus' && match.winner !== null) ||
+    (needsPocketCall() && announcedPocket === null && !scratchPending);
   spinButton.disabled = wasMoving || balls[0].pocketed;
   fineLeft.disabled = spinButton.disabled;
   fineRight.disabled = spinButton.disabled;
@@ -805,4 +918,5 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+syncMatchUI();
 versionWatcher.start();
