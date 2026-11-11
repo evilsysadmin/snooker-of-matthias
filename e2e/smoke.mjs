@@ -293,7 +293,8 @@ try {
     ));
     await page.locator('#restart').click();
     await page.waitForFunction(() =>
-      document.querySelector('#solo-status')?.dataset.shots === '0');
+      document.querySelector('#solo-status')?.dataset.shots === '0' &&
+      document.querySelector('#shots')?.textContent === '00');
     assert.match(await soloStatus.innerText(), /Récord: 9 tiros.*1 faltas/);
     assert.equal(await page.locator('#shots').innerText(), '00');
     await page.locator('#mode-practice').click();
