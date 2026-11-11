@@ -97,6 +97,17 @@ test('a grazing approach keeps the jaw/cushion prediction instead of claiming a 
   assert.ok(Math.abs(miss.z - (TABLE.halfZ - TABLE.ballRadius)) < 1e-9);
 });
 
+test('the aiming guide sees all four newly accessible diagonal corner mouths', () => {
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const preview = predictFirstContact([cue(sx * 3.75, sz * 1.55)],
+      sx * 0.58, sz * 0.60);
+    const pocket = sx < 0 ? (sz < 0 ? 0 : 3) : (sz < 0 ? 2 : 5);
+    assert.equal(preview.pocketIndex, pocket);
+    assert.equal(preview.ballId, null);
+    assert.equal(preview.jawIndex, null);
+  }
+});
+
 test('invalid directions and scratched white yield no prediction', () => {
   assert.equal(predictFirstContact([cue()], 0, 0), null);
   assert.equal(predictFirstContact([cue()], Infinity, 0), null);
