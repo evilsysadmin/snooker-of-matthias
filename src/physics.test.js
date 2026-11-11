@@ -313,8 +313,10 @@ test('optional shot telemetry records cue first contact without changing legacy 
     { id: 1, x: 0, z: 0, vx: 0, vz: 0, pocketed: false },
   ];
   const events = stepPhysics(balls, 1 / 120, { trackContacts: true });
-  assert.deepEqual(events.filter((event) => event.type === 'contact'),
-    [{ type: 'contact', a: 0, b: 1 }]);
+  const contacts = events.filter((event) => event.type === 'contact');
+  assert.equal(contacts.length, 1);
+  assert.deepEqual([contacts[0].a, contacts[0].b], [0, 1]);
+  assert.ok(contacts[0].impactSpeed > 3, 'measured collision speed, not invented');
   assert.ok(balls[1].vx > 3.5);
 });
 
@@ -324,8 +326,10 @@ test('rail telemetry counts only incoming collisions, not travel along cushion',
     vx: 2, vz: 0, pocketed: false,
   };
   const events = stepPhysics([ball], 1 / 120, { trackContacts: true });
-  assert.deepEqual(events.filter((event) => event.type === 'rail'),
-    [{ type: 'rail', id: 6 }]);
+  const railEvents = events.filter((event) => event.type === 'rail');
+  assert.equal(railEvents.length, 1);
+  assert.equal(railEvents[0].id, 6);
+  assert.ok(railEvents[0].impactSpeed > 1.8, 'incoming speed is recorded before rebound');
   assert.ok(ball.vx < 0);
   const second = stepPhysics([ball], 1 / 120, { trackContacts: true });
   assert.deepEqual(second.filter((event) => event.type === 'rail'), []);
@@ -344,4 +348,17 @@ test('contact and rail telemetry are opt-in; existing callers stay compatible', 
   ];
   const events = stepPhysics(balls, 1 / 120);
   assert.deepEqual(events, []);
+});
+
+test('impact telemetry is not affected by elasticity or audio preferences', () => {
+  const cue = {
+    id: 0, x: -(2 * TABLE.ballRadius + 0.009), z: 0, vx: 1.5, vz: 0,
+    pocketed: false,
+  };
+  const ball = { id: 3, x: 0, z: 0, vx: 0, vz: 0, pocketed: false };
+  const tracked = stepPhysics([cue, ball], 1 / 120, { trackContacts: true });
+  const hit = tracked.find((event) => event.type === 'contact');
+  assert.ok(hit && Number.isFinite(hit.impactSpeed));
+  assert.ok(hit.impactSpeed > 1 && hit.impactSpeed < 2);
+  assert.deepEqual(tracked.filter((event) => event.type === 'potted'), []);
 });
