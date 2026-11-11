@@ -17,7 +17,13 @@ import { poolBallSpec, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS,
 const app = document.querySelector('#app');
 app.innerHTML = [
   '<main class="game">',
-  '<div id="viewport" aria-label="Mesa de billar tridimensional interactiva"></div>',
+  '<div id="viewport" aria-label="Mesa de billar tridimensional interactiva">',
+    '<div id="target-lens" class="target-lens" data-side="right" hidden',
+      ' aria-label="Bola prevista en el primer contacto">',
+      '<span class="target-ball" aria-hidden="true"><span id="target-ball-number"></span></span>',
+      '<span class="target-lens-label" aria-hidden="true">PRIMER TOQUE</span>',
+    '</div>',
+  '</div>',
   '<header class="topbar">',
     '<div class="brand"><span class="brand-icon">✦</span><div class="brand-copy">',
       '<small>SHADOWOPS PRESENTA</small><strong>BILLIARDS <em>OF</em> MATTHIAS</strong>',
@@ -73,6 +79,11 @@ app.innerHTML = [
 ].join('');
 
 const viewport = document.querySelector('#viewport');
+const targetLens = document.querySelector('#target-lens');
+const targetBallNumber = document.querySelector('#target-ball-number');
+let hasAimed = false;
+let lastLensTarget = null;
+let lensPositionDirty = true;
 const shotDisplay = document.querySelector('#shots');
 const pocketDisplay = document.querySelector('#potted');
 const commentary = document.querySelector('#commentary');
@@ -499,6 +510,7 @@ function nudgeAim(direction) {
   const rotated = rotateAim(aim.x, aim.z, direction * FINE_AIM_STEP_DEGREES);
   if (!rotated) return;
   aim.set(rotated.x, 0, rotated.z);
+  hasAimed = true;
   fineAimSteps += direction;
   setFineAngleDisplay();
 }
@@ -585,6 +597,8 @@ function restart() {
   wasMoving = false;
   dirtyHUD = true;
   fineAimSteps = 0;
+  hasAimed = false;
+  syncTargetLens(null);
   setFineAngleDisplay();
   cueSpin = 0;
   updateSpinButton();
@@ -736,6 +750,7 @@ function pointAim(event, commitPlacement = false) {
   const dz = point.z - balls[0].z;
   if (Math.hypot(dx, dz) < TABLE.ballRadius * 2) return;
   aim.set(dx, 0, dz).normalize();
+  hasAimed = true;
   // Direct pointer aiming establishes a new baseline for fine adjustments.
   fineAimSteps = 0;
   setFineAngleDisplay();
@@ -765,6 +780,47 @@ canvas.addEventListener('pointercancel', () => {
   placementPointerId = null;
 });
 
+// On narrow portrait screens the physical balls are only a few pixels wide.
+// Show the actual *first predicted contact* enlarged in the side gutter,
+// without changing any ball/collider sizes, covering the cloth, or inventing
+// a target when the path hits a cushion or jaw. The badge is never clickable.
+const projectedTarget = new THREE.Vector3();
+function syncTargetLens(id) {
+  const portrait = window.matchMedia('(max-width: 700px) and (min-height: 700px)').matches;
+  if (!portrait || !hasAimed || !Number.isInteger(id) || id < 1 || id > OBJECT_BALL_COUNT) {
+    if (!targetLens.hidden) targetLens.hidden = true;
+    lastLensTarget = null;
+    return;
+  }
+  const target = balls.find((ball) => ball.id === id && !ball.pocketed);
+  if (!target) {
+    targetLens.hidden = true;
+    lastLensTarget = null;
+    return;
+  }
+  const changed = lastLensTarget !== id;
+  if (changed) {
+    const spec = poolBallSpec(id);
+    targetBallNumber.textContent = String(id).padStart(2, '0');
+    targetLens.style.setProperty('--ball-color', spec.color);
+    targetLens.dataset.striped = String(spec.striped);
+    targetLens.dataset.ballId = String(id);
+    targetLens.setAttribute('aria-label', 'Primer contacto previsto: bola ' + id);
+    lastLensTarget = id;
+    targetLens.hidden = false;
+  }
+  if (!changed && !lensPositionDirty) return;
+  projectedTarget.set(target.x, TABLE.ballRadius + 0.052, target.z).project(camera);
+  // The 62px lens lives in the side gutter, opposite the projected ball.
+  // Vertical position follows the ball but never overlaps the top controls.
+  targetLens.dataset.side = projectedTarget.x >= 0 ? 'left' : 'right';
+  const height = viewport.clientHeight;
+  const minTop = mode === 'solo' ? 91 : 55;
+  const y = (1 - projectedTarget.y) * height / 2 - 28;
+  targetLens.style.top = Math.round(Math.max(minTop, Math.min(height - 72, y))) + 'px';
+  lensPositionDirty = false;
+}
+
 function updateCue(now) {
   const cue = balls[0];
   ghostRing.visible = false;
@@ -791,6 +847,7 @@ function updateCue(now) {
       cueStick.visible = true;
       guide.visible = false;
       viewport.dataset.stroke = 'active';
+      syncTargetLens(null);
       return;
     }
     strokeAnimation = null;
@@ -799,7 +856,7 @@ function updateCue(now) {
   const available = !cue.pocketed && !ballsMoving(balls);
   cueStick.visible = available;
   guide.visible = available;
-  if (!available) return;
+  if (!available) { syncTargetLens(null); return; }
   // Put the actual tip just behind the white, with a small power-dependent draw-back.
   // 1.34 is the tip's local x coordinate inside the cue-stick model.
   const offset = 1.34 + TABLE.ballRadius + 0.04 + (Number(powerInput.value) / 100) * 0.15;
@@ -807,7 +864,8 @@ function updateCue(now) {
   cueDirection.copy(aim);
   cueStick.rotation.y = -Math.atan2(aim.z, aim.x);
   const preview = predictFirstContact(balls, aim.x, aim.z);
-  if (!preview) { guide.visible = false; return; }
+  if (!preview) { guide.visible = false; syncTargetLens(null); return; }
+  syncTargetLens(preview.ballId);
   const start = Math.min(preview.distance, TABLE.ballRadius * 1.2);
   const front = new THREE.Vector3(cue.x + aim.x * start, 0.095, cue.z + aim.z * start);
   const end = new THREE.Vector3(preview.x, 0.095, preview.z);
@@ -903,6 +961,7 @@ function resize() {
     else near = mid;
   }
   fits(far);
+  lensPositionDirty = true;
   // Paint immediately with the freshly fitted camera when the drawing buffer
   // actually changes size. Physics remains exclusively in the fixed-step RAF.
   // No work is done for repeated ResizeObserver notifications of equal size.
@@ -910,6 +969,7 @@ function resize() {
 }
 function setCameraMode(mode) {
   camera = mode === '3d' ? perspectiveCamera : topCamera;
+  lensPositionDirty = true;
   scene.fog = mode === '3d' ? perspectiveFog : null;
   viewport.dataset.camera = mode;
   topCameraButton.setAttribute('aria-pressed', String(mode === 'top'));
