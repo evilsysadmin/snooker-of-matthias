@@ -101,3 +101,81 @@ test('no polling while hidden and denied/failed reads never show a banner', asyn
   assert.equal(notices, 1);
   watcher.stop();
 });
+
+test('after short cookie expiry, renew through existing signed-in Identity flow once', async () => {
+  const calls = [];
+  const token = 'header.payload.signature';
+  const response = (status, value) => ({
+    ok: status >= 200 && status < 300, status,
+    headers: new Headers({ 'content-type': 'application/json' }),
+    json: async () => value,
+  });
+  const fetcher = async (url, opts) => {
+    calls.push({ url, opts });
+    if (calls.length === 1) return response(401, { error: 'authentication_required' });
+    if (calls.length === 2) return response(200, { token });
+    if (calls.length === 3) return response(200, { identity: 'snooker' });
+    if (calls.length === 4) return response(200, valid(B));
+    throw Error('unexpected extra request');
+  };
+  assert.equal(await readDeployedRelease(fetcher), B);
+  assert.deepEqual(calls.map((c) => c.url), [
+    '/release.json',
+    'https://id-staging.shadowops.dpdns.org/api/identity/token',
+    '/api/snooker/session',
+    '/release.json',
+  ]);
+  assert.equal(calls[1].opts.credentials, 'include');
+  assert.equal(calls[1].opts.method, 'POST');
+  assert.equal(calls[1].opts.cache, 'no-store');
+  assert.equal(calls[2].opts.credentials, 'same-origin');
+  assert.equal(calls[2].opts.method, 'POST');
+  assert.equal(calls[2].opts.body, JSON.stringify({ token }));
+  assert.equal(calls[3].opts.credentials, 'same-origin');
+});
+
+test('logged-out or revoked Identity cannot renew, and no manifest is exposed', async () => {
+  const calls = [];
+  const response = (status, value = {}) => ({
+    ok: status >= 200 && status < 300, status,
+    headers: new Headers({ 'content-type': 'application/json' }),
+    json: async () => value,
+  });
+  assert.equal(await readDeployedRelease(async (url, options) => {
+    calls.push([url, options]);
+    return calls.length === 1 ? response(401) : response(401);
+  }), null);
+  assert.equal(calls.length, 2, 'no session POST when IdP rejects');
+  assert.equal(calls[1][0], 'https://id-staging.shadowops.dpdns.org/api/identity/token');
+
+  let posted = false;
+  assert.equal(await readDeployedRelease(async (url) => {
+    if (url === '/api/snooker/session') {
+      posted = true;
+      throw Error('invalid token must never be posted');
+    }
+    return url === '/release.json'
+      ? response(401) : response(200, { token: 'x'.repeat(8193) });
+  }), null);
+  assert.equal(posted, false, 'invalid/oversized token rejected in browser');
+
+  let count = 0;
+  assert.equal(await readDeployedRelease(async () => {
+    count++;
+    if (count === 1) return response(401);
+    if (count === 2) return response(200, { token: 'test.identity.jwt' });
+    if (count === 3) return response(200);
+    return response(401);
+  }), null, 'edge still denies access even after IdP claims a session');
+  assert.equal(count, 4, 'renewal is attempted only once');
+});
+
+test('non-auth failures never trigger the refresh flow', async () => {
+  let requests = 0;
+  const result = await readDeployedRelease(async () => {
+    requests++;
+    return { ok: false, status: 503, headers: new Headers(), json: async () => null };
+  });
+  assert.equal(result, null);
+  assert.equal(requests, 1, 'temporary Identity or Pages outage stays fail closed');
+});
