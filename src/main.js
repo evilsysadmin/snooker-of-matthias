@@ -8,6 +8,7 @@ import { predictFirstContact } from './aimPrediction.js';
 import { FINE_AIM_STEP_DEGREES, rotateAim } from './fineAim.js';
 import { resolveStrokePower } from './strokeInteraction.js';
 import { remainingObjectBalls } from './practiceRules.js';
+import { createVersionWatcher } from './versionNotice.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -24,6 +25,12 @@ app.innerHTML = [
     '</div>',
   '</header>',
   '<div class="table-label"><span class="table-label-dot"></span> POOL 8-BALL · PRÁCTICA LIBRE · 3D ALPHA</div>',
+  '<aside id="update-banner" class="update-banner" role="status" hidden>',
+    '<div class="update-copy"><strong>🎱 Nueva versión disponible</strong>',
+      '<div>Actualizar reinicia la mesa actual.</div></div>',
+    '<button id="update-now" class="update-now" type="button">Actualizar</button>',
+    '<button id="update-later" class="update-later" type="button">Más tarde</button>',
+  '</aside>',
   '<div class="camera-switch" role="group" aria-label="Vista de cámara">',
     '<button id="camera-top" class="camera-option" type="button" aria-pressed="true">Cenital</button>',
     '<button id="camera-3d" class="camera-option" type="button" aria-pressed="false">3D</button>',
@@ -66,6 +73,9 @@ const fineLeft = document.querySelector('#fine-left');
 const fineRight = document.querySelector('#fine-right');
 const fineAngle = document.querySelector('#fine-angle');
 const charge = createShotCharge();
+const updateBanner = document.querySelector('#update-banner');
+const updateNow = document.querySelector('#update-now');
+const updateLater = document.querySelector('#update-later');
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#071316');
@@ -348,6 +358,27 @@ let fineAimSteps = 0;
 let cueSpin = 0; // -1: draw, 0: centre, +1: follow
 let pointerStroke = null;
 let strokeAnimation = null;
+let availableUpdate = false;
+const versionWatcher = createVersionWatcher({
+  isVisible: () => !document.hidden,
+  onAvailable: () => {
+    availableUpdate = true;
+    // Never cover a live shot. Show the notice after the balls settle.
+    if (!ballsMoving(balls)) updateBanner.hidden = false;
+  },
+});
+updateLater.addEventListener('click', () => {
+  updateBanner.hidden = true;
+  availableUpdate = false;
+});
+updateNow.addEventListener('click', () => {
+  if (ballsMoving(balls)) return; // No automatic interruption of a shot.
+  window.location.reload(); // Explicit click, game state currently resets.
+});
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) void versionWatcher.check();
+});
+window.addEventListener('focus', () => void versionWatcher.check());
 
 function setFineAngleDisplay() {
   const change = fineAimSteps * FINE_AIM_STEP_DEGREES;
@@ -746,6 +777,7 @@ function frame(now) {
     }
   }
   wasMoving = ballsMoving(balls);
+  if (availableUpdate && !wasMoving) updateBanner.hidden = false;
   if (dirtyHUD) { formatScore(); dirtyHUD = false; }
   if (scratchPending !== wasPlacementMode) {
     wasPlacementMode = scratchPending;
@@ -773,3 +805,4 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+versionWatcher.start();
