@@ -19,7 +19,11 @@ try {
       isMobile: config.isMobile, hasTouch: config.hasTouch,
     });
     const page = await context.newPage();
-    let publishedSha = 'a'.repeat(40);
+    // A real CI build embeds github.sha. Mock the *same* published release
+    // first, so no update banner appears unless release.json genuinely moves.
+    const verifiedBuildSha = process.env.VITE_SOURCE_SHA || process.env.GITHUB_SHA;
+    let publishedSha = /^[a-f0-9]{40}$/.test(verifiedBuildSha || '')
+      ? verifiedBuildSha : 'a'.repeat(40);
     // Exercise the protected release.json contract without a live login.
     await page.route('**/release.json', (route) => route.fulfill({
       status: 200, contentType: 'application/json',
