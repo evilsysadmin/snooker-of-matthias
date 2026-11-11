@@ -903,6 +903,27 @@ function setCameraMode(mode) {
 }
 topCameraButton.addEventListener('click', () => setCameraMode('top'));
 perspectiveCameraButton.addEventListener('click', () => setCameraMode('3d'));
+// Position the phone playfield against the *real* control panel height.
+// Commentary can wrap to more lines on smaller phones. A fixed CSS bottom
+// caused an actual 4 px overlap at 390 px even though visual mockups fit.
+// This uses content geometry, not guessed device offsets, and also keeps the
+// protected update notice above the buttons whenever it is displayed.
+const controlPanel = document.querySelector('.bottom-panel');
+function keepMobileTableClear() {
+  const portraitUI = window.matchMedia('(max-width: 700px) and (min-height: 700px)').matches;
+  if (!portraitUI) {
+    viewport.style.removeProperty('bottom');
+    updateBanner.style.removeProperty('bottom');
+    return;
+  }
+  const panelTop = controlPanel.getBoundingClientRect().top;
+  const bottom = Math.max(195, Math.ceil(window.innerHeight - panelTop + 10));
+  viewport.style.bottom = bottom + 'px';
+  updateBanner.style.bottom = (bottom + 10) + 'px';
+}
+new ResizeObserver(keepMobileTableClear).observe(controlPanel);
+window.addEventListener('resize', keepMobileTableClear);
+keepMobileTableClear();
 new ResizeObserver(resize).observe(viewport);
 resize();
 setCameraMode('top');
