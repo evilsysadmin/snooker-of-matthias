@@ -457,13 +457,13 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   }
 }
 @media (max-width: 700px) and (min-height: 700px) {
-  #viewport { top: 100px; bottom: 185px; }
-  .solo-status { top: 104px; }
+  #viewport { top: 96px; bottom: 195px; }
+  .solo-status { top: 99px; }
   /* The manual update action remains accessible and cannot overlap header,
      fine-aim, camera or strike controls on a phone. */
   .update-banner, #viewport[data-game-mode="solo"] ~ .update-banner {
     top: auto;
-    bottom: 195px;
+    bottom: 205px;
     right: 10px;
     left: auto;
   }
