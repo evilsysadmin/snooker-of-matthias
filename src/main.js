@@ -4,6 +4,7 @@ import {
 } from './physics.js';
 import './styles.css';
 import { createShotCharge } from './shotCharge.js';
+import { cueIdleGap, cueStrokePose, CUE_TIP_LOCAL_X } from './cueMotion.js';
 import { predictFirstContact } from './aimPrediction.js';
 import { FINE_AIM_STEP_DEGREES, rotateAim } from './fineAim.js';
 import { resolveStrokePower } from './strokeInteraction.js';
@@ -404,7 +405,7 @@ grip.position.x = -1.05;
 cueStick.add(grip);
 const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.023, 0.023, 0.06, 12), tipMaterial);
 tip.rotation.z = Math.PI / 2;
-tip.position.x = 1.34;
+tip.position.x = CUE_TIP_LOCAL_X;
 cueStick.add(tip);
 scene.add(cueStick);
 const guide = new THREE.Line(
@@ -442,6 +443,7 @@ placementGhost.renderOrder = 5;
 placementGhost.visible = false;
 scene.add(placementGhost);
 const cueDirection = new THREE.Vector3(1, 0, 0);
+const reducedCueMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 let balls = createRack();
 let shots = 0;
