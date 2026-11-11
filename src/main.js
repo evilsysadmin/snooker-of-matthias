@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 import {
-  TABLE, POCKETS, POCKET_JAWS, BAULK, COLOUR_SPOTS, OBJECT_BALL_COUNT, createRack, strikeCue, stepPhysics, ballsMoving, respawnCue, canPlaceCueInD,
+  TABLE, POCKETS, POCKET_JAWS, CUE_START, RACK_APEX, OBJECT_BALL_COUNT, createRack, strikeCue, stepPhysics, ballsMoving, respawnCue, canPlaceCueOnTable,
 } from './physics.js';
 import './styles.css';
 import { createShotCharge } from './shotCharge.js';
 import { predictFirstContact } from './aimPrediction.js';
 import { FINE_AIM_STEP_DEGREES, rotateAim } from './fineAim.js';
 import { resolveStrokePower } from './strokeInteraction.js';
-import { respotPracticeColours, redsOnTable, remainingObjectBalls } from './practiceRules.js';
+import { remainingObjectBalls } from './practiceRules.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -15,7 +15,7 @@ app.innerHTML = [
   '<div id="viewport" aria-label="Mesa de billar tridimensional interactiva"></div>',
   '<header class="topbar">',
     '<div class="brand"><span class="brand-icon">✦</span><div class="brand-copy">',
-      '<small>SHADOWOPS PRESENTA</small><strong>SNOOKER <em>OF</em> MATTHIAS</strong>',
+      '<small>SHADOWOPS PRESENTA</small><strong>BILLIARDS <em>OF</em> MATTHIAS</strong>',
     '</div></div>',
     '<div class="scoreboard" aria-live="polite">',
       '<div><span>TIROS</span><strong id="shots">00</strong></div>',
@@ -23,7 +23,7 @@ app.innerHTML = [
       '<div><span>EMBOCADAS</span><strong id="potted">00 <small>· ' + OBJECT_BALL_COUNT + ' en mesa</small></strong></div>',
     '</div>',
   '</header>',
-  '<div class="table-label"><span class="table-label-dot"></span> SNOOKER · PRÁCTICA LIBRE · 3D ALPHA</div>',
+  '<div class="table-label"><span class="table-label-dot"></span> POOL 8-BALL · PRÁCTICA LIBRE · 3D ALPHA</div>',
   '<div class="camera-switch" role="group" aria-label="Vista de cámara">',
     '<button id="camera-top" class="camera-option" type="button" aria-pressed="true">Cenital</button>',
     '<button id="camera-3d" class="camera-option" type="button" aria-pressed="false">3D</button>',
@@ -188,34 +188,21 @@ for (const jaw of POCKET_JAWS) {
   scene.add(tip);
 }
 
-// Authentic, subtle baulk line, D arc and colour spots. All sit above the cloth
-// but below the balls, and don't participate in physics/raycaster collisions.
+// Pool head string and spots; no snooker D or colour respots.
 const clothInk = new THREE.MeshBasicMaterial({
-  color: 0xe8e6d1, transparent: true, opacity: 0.52, depthWrite: false,
+  color: 0xe8e6d1, transparent: true, opacity: 0.40, depthWrite: false,
 });
-const line = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.003, 2 * TABLE.halfZ), clothInk);
-line.position.set(BAULK.x, 0.056, 0);
-scene.add(line);
-const dPoints = Array.from({ length: 65 }, (_, i) => {
-  const angle = Math.PI * i / 64;
-  return new THREE.Vector3(
-    BAULK.x - BAULK.radius * Math.sin(angle), 0.058, BAULK.radius * Math.cos(angle),
-  );
-});
-const dArc = new THREE.Mesh(
-  new THREE.TubeGeometry(new THREE.CatmullRomCurve3(dPoints), 64, 0.007, 5, false),
-  clothInk,
+const headString = new THREE.Mesh(
+  new THREE.BoxGeometry(0.012, 0.003, 2 * TABLE.halfZ), clothInk,
 );
-scene.add(dArc);
-const placementInk = clothInk.clone();
-placementInk.color.setHex(0xe1c388);
-placementInk.opacity = 0.96;
-const spotGeometry = new THREE.CircleGeometry(0.026, 24);
+headString.position.set(CUE_START.x, 0.056, 0);
+scene.add(headString);
+const spotGeometry = new THREE.CircleGeometry(0.020, 24);
 const spotMaterial = new THREE.MeshBasicMaterial({
-  color: 0xf2ead6, transparent: true, opacity: 0.70, depthWrite: false,
-  side: THREE.DoubleSide,
+  color: 0xf2ead6, transparent: true, opacity: 0.65,
+  depthWrite: false, side: THREE.DoubleSide,
 });
-for (const { x, z } of COLOUR_SPOTS) {
+for (const { x, z } of [CUE_START, RACK_APEX]) {
   const spot = new THREE.Mesh(spotGeometry, spotMaterial);
   spot.rotation.x = -Math.PI / 2;
   spot.position.set(x, 0.060, z);
@@ -228,19 +215,64 @@ for (const x of [-3.72, 3.72]) for (const z of [-1.64, 1.64]) {
 }
 
 const ballGeo = new THREE.SphereGeometry(TABLE.ballRadius, 32, 24);
-// White, 15 reds, then yellow, green, brown, blue, pink and black.
-const colors = [
-  0xfaf9ed, ...Array(15).fill(0xb11e2e),
-  0xf1d02d, 0x237342, 0x86502d, 0x244cb2, 0xf0a0b2, 0x15191b,
+// American pool: numbered solids 1–7, black 8, striped 9–15.
+const poolColors = [
+  0xfaf9ed, 0xf2c538, 0x255fbd, 0xb72731, 0x66419b,
+  0xe48a29, 0x258d5a, 0x753524, 0x121819,
+  0xf2c538, 0x255fbd, 0xb72731, 0x66419b,
+  0xe48a29, 0x258d5a, 0x753524,
 ];
+function numberDecal(number) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 128, 128);
+  ctx.fillStyle = '#fffaf0';
+  ctx.beginPath();
+  ctx.arc(64, 64, 60, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#182023';
+  ctx.font = 'bold 76px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(number), 64, 68);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
 function ballModel(number) {
   const group = new THREE.Group();
+  const striped = number >= 9;
+  const ballColor = poolColors[number];
   const base = new THREE.Mesh(ballGeo, new THREE.MeshPhysicalMaterial({
-    color: colors[number], roughness: 0.15, clearcoat: 0.85, clearcoatRoughness: 0.12,
+    color: striped ? 0xfaf9ed : ballColor,
+    roughness: 0.15, clearcoat: 0.85, clearcoatRoughness: 0.12,
   }));
   base.castShadow = true;
   base.receiveShadow = true;
   group.add(base);
+  if (striped) {
+    group.add(new THREE.Mesh(
+      new THREE.SphereGeometry(TABLE.ballRadius * 1.006, 32, 20,
+        0, Math.PI * 2, Math.PI * 0.33, Math.PI * 0.34),
+      new THREE.MeshPhysicalMaterial({
+        color: ballColor, roughness: 0.15, clearcoat: 0.85,
+      }),
+    ));
+  }
+  if (number > 0) {
+    const decal = new THREE.Mesh(
+      new THREE.CircleGeometry(TABLE.ballRadius * 0.47, 24),
+      new THREE.MeshBasicMaterial({
+        map: numberDecal(number), transparent: true, depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    decal.rotation.x = -Math.PI / 2;
+    decal.position.y = TABLE.ballRadius * 1.006;
+    group.add(decal);
+  }
   scene.add(group);
   return group;
 }
@@ -312,7 +344,6 @@ let placementCandidate = null;
 let placementPointerId = null;
 let wasPlacementMode = false;
 let dirtyHUD = true;
-let redPhaseAnnounced = false;
 let fineAimSteps = 0;
 let cueSpin = 0; // -1: draw, 0: centre, +1: follow
 let pointerStroke = null;
@@ -365,7 +396,6 @@ function restart() {
   balls = createRack();
   shots = 0;
   potted = 0;
-  redPhaseAnnounced = false;
   scratchPending = false;
   placementPrompted = false;
   placementCandidate = null;
@@ -378,7 +408,7 @@ function restart() {
   updateSpinButton();
   say('Matthias: Otra oportunidad de desafiar a la geometría. Adelante, campeón.');
 }
-function placeWhiteInD(x, z) {
+function placeWhiteInHand(x, z) {
   if (!scratchPending || !respawnCue(balls, x, z)) return false;
   scratchPending = false;
   placementPrompted = false;
@@ -403,7 +433,7 @@ function shoot(power = Number(powerInput.value) / 100) {
 // fires with the chosen slider power; holding makes the stroke tactile on touch.
 strikeButton.addEventListener('pointerdown', (event) => {
   if (event.button !== 0 || strikeButton.disabled || charge.active) return;
-  if (scratchPending) { placeWhiteInD(); return; }
+  if (scratchPending) { placeWhiteInHand(); return; }
   const now = performance.now();
   if (!charge.start(now)) return;
   pointerStroke = { id: event.pointerId, started: now, preset: Number(powerInput.value) / 100 };
@@ -435,7 +465,7 @@ strikeButton.addEventListener('lostpointercapture', () => {
 // pointer release; never fire twice after a mouse/touch pointerup.
 strikeButton.addEventListener('click', (event) => {
   if (event.detail === 0) {
-    if (scratchPending) placeWhiteInD();
+    if (scratchPending) placeWhiteInHand();
     else shoot();
   }
 });
@@ -499,9 +529,9 @@ function pointAim(event, commitPlacement = false) {
   ray.setFromCamera(pointer, camera);
   if (!ray.ray.intersectPlane(clothPlane, point)) return;
   if (scratchPending) {
-    const valid = canPlaceCueInD(balls, point.x, point.z);
+    const valid = canPlaceCueOnTable(balls, point.x, point.z);
     placementCandidate = { x: point.x, z: point.z, valid };
-    if (commitPlacement && valid) placeWhiteInD(point.x, point.z);
+    if (commitPlacement && valid) placeWhiteInHand(point.x, point.z);
     return;
   }
   if (balls[0].pocketed) return;
@@ -543,7 +573,6 @@ function updateCue(now) {
   ghostRing.visible = false;
   impactDot.visible = false;
   placementGhost.visible = scratchPending && !ballsMoving(balls) && Boolean(placementCandidate);
-  dArc.material = scratchPending ? placementInk : clothInk;
   if (placementGhost.visible) {
     placementGhost.position.set(placementCandidate.x, TABLE.ballRadius + 0.052, placementCandidate.z);
     placementGhost.material.color.setHex(placementCandidate.valid ? 0xf6e8be : 0xe86464);
@@ -707,30 +736,10 @@ function frame(now) {
     accumulator -= FIXED_DT;
   }
   if (!ballsMoving(balls)) {
-    // This is a shot-end practice rule, not a physics collision. Restore only
-    // now, never while another ball is rolling or the white is in flight.
-    const returned = respotPracticeColours(balls);
-    if (returned.length) {
-      dirtyHUD = true;
-      if (!scratchPending) {
-        const names = { 16: 'amarilla', 17: 'verde', 18: 'marrón',
-          19: 'azul', 20: 'rosa', 21: 'negra' };
-        say(returned.length === 1
-          ? 'Matthias: La ' + names[returned[0].id] +
-            ' vuelve a su marca. Todavía quedan rojas, por desgracia.'
-          : 'Matthias: ' + returned.length +
-            ' colores recolocados. El tapete no se limpia solo.');
-      }
-    }
-    if (!redsOnTable(balls) && !redPhaseAnnounced) {
-      redPhaseAnnounced = true;
-      if (!scratchPending && wasMoving) {
-        say('Matthias: Última roja fuera. Ahora los colores ya no regresan.');
-      }
-    }
+    // Pool object balls stay pocketed; no snooker colour respotting.
     if (scratchPending && !placementPrompted) {
       placementPrompted = true;
-      say('Matthias: Blanca en mano. Toca un hueco libre dentro de la D, o pulsa COLOCAR.');
+      say('Matthias: Blanca en mano. Elige un hueco libre en la mesa, o pulsa COLOCAR.');
     }
     if (wasMoving && !scratchPending && remainingObjectBalls(balls) === 0) {
       say('Matthias: Todas dentro. Me veo obligado, muy a mi pesar, a felicitarte.');
@@ -744,7 +753,7 @@ function frame(now) {
       ? '<span>◌</span> COLOCAR'
       : '<span>⚡</span> GOLPEAR <kbd>ESPACIO</kbd>';
     const aria = scratchPending
-      ? 'Colocar blanca automáticamente en un punto libre de la D'
+      ? 'Colocar blanca automáticamente en un punto libre de la mesa'
       : 'Golpear: toca para usar la potencia elegida, mantén pulsado para cargar';
     strikeButton.setAttribute('aria-label', aria);
     strikeButton.title = aria;

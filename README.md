@@ -1,48 +1,42 @@
-# 🎱 Snooker of Matthias
+# 🎱 Billiards of Matthias
 
-A deliberately small but **playable 3D snooker** experiment for the ShadowOps family. No physics-engine Kubernetes cluster (yet).
+A playable **American pool 8-ball free-practice** game in real 3D, part of ShadowOps. The current repository, npm package and staging technical IDs retain their original `snooker` names for backward compatibility with the protected Identity/Cloudflare deployment. Product branding is **Billiards of Matthias**.
 
-## First POC
+## Pool practice (current)
 
-- Real 3D table with cloth baulk/D markings, colour spots, rounded cushion noses, dark leather-look pocket mouths, cue and 22 snooker balls: 15 reds, six coloured balls and the white.
-- Table-scale pass: smaller, closer-to-snooker-proportion balls (kept slightly larger for mobile readability), properly spaced red triangle, scaled baulk/D and **tighter corner/middle pocket mouths**. The rendered pocket circles and collision capture use the same radius, so rail-grazing misses bounce instead of being magically swallowed. These pocket radii remain *playability-tuned approximations*, not WPBSA-authorised pocket templates.
-- The six pockets now each have two rounded **felt jaw shoulders** with actual deterministic collisions; a glancing ball can be rejected or deflected, rather than passing through decorative geometry. The first-contact guide stops at a jaw and shows a small amber impact marker when a jaw would be struck before a ball or straight cushion. Pocket geometry remains a simplified practice-table approximation, not official shaped rubber/jaw templates.
-- Play with the default true overhead (orthographic) camera or switch instantly to the cinematic 3D camera using **Cenital / 3D**; both use the same table, balls and shot state.
-- Aim by moving/dragging on the table in either camera; the guide stops at the first ball (ghost-white ring and contact point) or cushion, without predicting spin or rebounds.
-- On narrow/mobile screens use the **↶ / ↷ 0,5°** fine-aim buttons below shot power for sub-degree corrections; tapping the table resets the displayed correction baseline.
-- **Tactile cue stroke** on desktop and mobile: tap **GOLPEAR** to shoot with the selected slider power, or hold it to charge a visible rising/falling strength and release to strike. The cue draws back during charge and briefly animates its tip on release. Drag off the strike button to cancel instead of firing. SPACE offers the same hold-to-charge behavior, while focused buttons retain normal keyboard activation.
-- The compact **● Centro → ↑ Sigue → ↓ Retro** button cycles cue-ball strike effects. Follow/draw change actual cue motion via a deterministic, bounded cloth-traction approximation after contact; not a full angular-velocity model. The first-contact aiming guide does not predict post-impact spin paths.
-- Fixed-step deterministic collision, cushions, friction and pocket capture. After a scratch, wait for all balls to stop, then touch/drag the white to a legal unoccupied spot inside the baulk D; the temporary **COLOCAR** control picks a legal D spot for keyboard access. The game rejects placements outside D and overlapping balls.
-- Shot counter plus total successful pots and live balls remaining (colours can be potted more than once), reset, mobile-friendly interface and occasional Matthias snark.
-- **Colour respotting in free practice:** when the balls settle and a red remains, any potted colour returns to its own free spot, otherwise the highest vacant colour spot, otherwise the nearest free point along its spot line. Never overlaps another ball or reappears mid-shot. Once the last red is down, colours stay down permanently and the 21-object clearance remains achievable. This is a practice-mode approximation, not official shot/turn/foul or yellow-to-black sequencing.
-- **Free practice only**: authentic snooker layout, simplified colour respots, but no official snooker turn/scoring/foul rules, ordered final-colour clearance, AI, **side spin (English)** or multiplayer yet. Follow/draw is an initial simplified simulation, not a calibrated real-world snooker model.
+- Fifteen numbered object balls: solids 1–7, black 8 in the centre of the third rack row, stripes 9–15. The two back corners are a solid and a stripe, and the white starts on the centre of the head string.
+- White balls, solids and stripes use dedicated 3D colours/bands with visible numbers; the geometry and collision simulation use one shared pool-scale ball radius.
+- Six pockets with rounded jaw collisions, deterministic 120 Hz physics, cushion rebounds, friction and cue follow/draw approximation.
+- Real interactive Three.js table, cenital and 3D cameras, contact/jaw predictor, desktop/mouse and touch controls, fine aim, shot charging and reset.
+- Potted object balls **stay down**, including the black 8, rather than reappearing like snooker colours.
+- Scratched white is ball-in-hand anywhere legally clear on the cloth after balls stop; touch a vacant position or press **COLOCAR** to choose a safe default.
+- Shot/pot counters and Matthias's occasional sarcastic remarks.
 
-## Local development
+**Important:** This iteration is `Pool 8-ball · Práctica libre`, **not** a complete official 8-ball rules engine. It does not yet implement turns, break legality, solids/stripes assignment, intentional fouls, called 8-ball pocket or win/loss state. Keep the practice label visible until those rules are implemented and tested.
 
-Requires Node 22+.
+## Development
 
-~~~sh
+Requires Node.js 22+.
+
+```sh
 npm install
 npm test
-npm run dev
 npm run build
-~~~
+npm run dev
+```
 
-Open the URL Vite prints. Use the mouse, touch, the shot button or Space; R resets.
+`npm run smoke` executes the real browser desktop/mobile WebGL checks after starting the Vite preview at `http://127.0.0.1:4173/` (Playwright dependencies required).
 
-## Delivery boundary
+## Protected staging
 
-The checked-in GitHub Actions workflow tests and builds immutable source into dist/. It uploads a 7-day artifact; **it does not deploy**. Cloudflare Pages, DNS, staging access/Identity and any live publication belong to **evilsysadmin/shadowops-infra**.
+The game repo produces a CI-tested immutable frontend artifact. **It does not deploy to Cloudflare Pages or contain Identity secrets**. The `evilsysadmin/shadowops-infra` repo owns the existing private Pages project, ShadowOps Identity audience, DNS, deployment gate and guest-denial checks.
 
-Desired staging origin: **https://staging.snooker.shadowops.dpdns.org**.
+Technical staging URL: **https://staging.snooker.shadowops.dpdns.org/**. Do not rename Cloudflare Pages, the service audience, repo or DNS as part of a frontend-only game iteration. A coordinated migration with separate rollback is needed if those identifiers are eventually renamed.
 
-Do not point the hostname at a public unprotected Pages preview. Before live activation, Infra must provision the Pages project, secure it with ShadowOps Identity at the edge, allow the actual publish workflow and verify real authorization and the exact deployed source SHA. A build passing CI is not proof of deployment.
+## Structure
 
-## Architecture
-
-- src/physics.js: headless planar physics, 120 Hz fixed-step in the browser, plain JavaScript unit tests.
-- src/main.js: Three.js scene / rendering / input / HUD.
-- src/styles.css: desktop + mobile HUD.
-- No backend, remote data or persistent accounts.
-
-Build a fun billiards shot before expanding the scope.
+- `src/physics.js`: deterministic, headless ball/rail/pocket physics, centred white and pool triangle.
+- `src/practiceRules.js`: free-practice remaining-ball/clearance counters.
+- `src/main.js`: real Three.js scene, cue, stripes/numbers, input and HUD.
+- `src/styles.css`: desktop/mobile presentation.
+- `e2e/smoke.mjs`: real desktop/mobile WebGL interaction checks.

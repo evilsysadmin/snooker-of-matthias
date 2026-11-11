@@ -1,38 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  TABLE, BAULK, COLOUR_SPOTS, POCKETS, POCKET_JAWS, OBJECT_BALL_COUNT, createRack, ballsMoving, stepPhysics, strikeCue, respawnCue, canPlaceCueInD,
+  TABLE, CUE_START, RACK_APEX, POCKETS, POCKET_JAWS, OBJECT_BALL_COUNT, createRack, ballsMoving, stepPhysics, strikeCue, respawnCue, canPlaceCueOnTable,
 } from './physics.js';
 
-test('snooker practice rack has 15 reds, 6 colours and one cue, without overlapping', () => {
+test('American 8-ball has fifteen numbered balls and centred white without overlap', () => {
   const balls = createRack();
-  assert.equal(OBJECT_BALL_COUNT, 21);
+  assert.equal(OBJECT_BALL_COUNT, 15);
   assert.equal(balls.length, OBJECT_BALL_COUNT + 1);
-  assert.deepEqual([...balls.map((b) => b.id)].sort((a, b) => a - b),
-    Array.from({ length: OBJECT_BALL_COUNT + 1 }, (_, i) => i));
-  assert.equal(balls.filter((b) => b.id >= 1 && b.id <= 15).length, 15);
-  assert.deepEqual(balls.filter((b) => b.id >= 16).map((b) => b.id), [16, 17, 18, 19, 20, 21]);
-  assert.equal(COLOUR_SPOTS.length, 6);
-  for (const spot of COLOUR_SPOTS) {
-    const ball = balls.find((b) => b.id === spot.id);
-    assert.ok(ball, `missing colour ${spot.id}`);
-    assert.equal(ball.x, spot.x, `colour ${spot.id} x`);
-    assert.equal(ball.z, spot.z, `colour ${spot.id} z`);
-  }
-  assert.ok(BAULK.x < 0 && BAULK.x > -TABLE.halfX, 'baulk line lies inside table');
-  assert.ok(BAULK.radius > 0 && BAULK.radius < TABLE.halfZ, 'D fits inside cushion');
-  assert.equal(COLOUR_SPOTS[0].z, BAULK.radius);
-  assert.equal(COLOUR_SPOTS[1].z, -BAULK.radius);
-  assert.equal(COLOUR_SPOTS[2].x, BAULK.x);
-  assert.equal(balls.find((b) => b.id === 19).x, 0, 'blue is centred');
-  assert.ok(balls.find((b) => b.id === 20).x < balls.find((b) => b.id === 1).x,
-    'pink stands before red triangle');
-  assert.ok(balls.find((b) => b.id === 21).x > balls.find((b) => b.id === 15).x,
-    'black stands behind the red triangle');
+  assert.deepEqual([...balls.map((ball) => ball.id)].sort((x, y) => x - y),
+    Array.from({ length: OBJECT_BALL_COUNT + 1 }, (_, id) => id));
+  const cue = balls.find((ball) => ball.id === 0);
+  assert.deepEqual([cue.x, cue.z], [CUE_START.x, 0], 'white centered on head string');
+  const eight = balls.find((ball) => ball.id === 8);
+  const apex = balls.find((ball) => ball.id === 1);
+  assert.deepEqual([apex.x, apex.z], [RACK_APEX.x, 0]);
+  const gap = 2 * TABLE.ballRadius + 0.006;
+  assert.ok(Math.abs(eight.x - (RACK_APEX.x + gap * Math.sqrt(3))) < 1e-9);
+  assert.equal(eight.z, 0, 'eight sits at the centre of the third row');
+  const lastRowX = RACK_APEX.x + 4 * gap * Math.sqrt(3) / 2;
+  const corners = balls.filter((ball) => Math.abs(ball.x - lastRowX) < 1e-9 &&
+    Math.abs(ball.z) > gap * 1.9).map((ball) => ball.id).sort((x,y) => x-y);
+  assert.deepEqual(corners, [7,9], 'opposite back corners are solid and stripe');
   for (let i = 0; i < balls.length; i++) {
     for (let j = i + 1; j < balls.length; j++) {
       assert.ok(Math.hypot(balls[i].x - balls[j].x, balls[i].z - balls[j].z)
-        >= TABLE.ballRadius * 2 - 1e-9);
+        >= 2 * TABLE.ballRadius - 1e-9, 'pool balls must not overlap');
     }
   }
 });
@@ -67,20 +60,13 @@ test('corner pockets swallow objects and the cue ball without a wall rebound', (
 });
 
 
-test('ball, baulk and D proportions track snooker scale but keep mobile-readable balls', () => {
-  // WPBSA table: 3569 x 1778 mm; 52.5 mm balls; baulk 737 mm; D radius 292 mm.
-  const visualBallRatio = (2 * TABLE.ballRadius / (2 * TABLE.halfZ)) / (52.5 / 1778);
-  assert.ok(visualBallRatio > 1 && visualBallRatio < 1.25,
-    'balls stay modestly larger than regulation for mobile, not pool-sized');
-  const expectedBaulk = -TABLE.halfX + 2 * TABLE.halfX * 737 / 3569;
-  assert.ok(Math.abs(BAULK.x - expectedBaulk) < 0.03);
-  assert.ok(Math.abs(BAULK.radius - 2 * TABLE.halfZ * 292 / 1778) < 0.03);
-  const balls = createRack();
-  const apex = balls.find((b) => b.id === 1);
-  const pink = balls.find((b) => b.id === 20);
-  assert.ok(apex.x > pink.x);
-  assert.ok(Math.abs((apex.x - pink.x) - (2 * TABLE.ballRadius + 0.008)) < 1e-9,
-    'red triangle moves with ball size, never floats far behind pink');
+test('pool-size balls, head spot and rack remain inside table', () => {
+  const visualBallRatio = (2 * TABLE.ballRadius / (2 * TABLE.halfZ)) / (57.15 / 1270);
+  assert.ok(visualBallRatio > 0.85 && visualBallRatio < 1.2);
+  assert.ok(CUE_START.x < 0 && RACK_APEX.x > 0);
+  assert.ok(Math.abs(CUE_START.x) < TABLE.halfX - TABLE.ballRadius);
+  assert.ok(Math.abs(RACK_APEX.x) < TABLE.halfX - TABLE.ballRadius);
+  assert.equal(CUE_START.z, 0);
 });
 
 test('corner and middle pocket physics use the same mouths rendered in 3D', () => {
@@ -217,47 +203,42 @@ test('scratched cue is restored only once all the other balls stop', () => {
 });
 
 
-test('cue in hand accepts only stationary, vacant points inside the baulk D', () => {
+test('pool ball-in-hand accepts any vacant table location when stopped', () => {
   const balls = createRack();
   const cue = balls[0];
   cue.pocketed = true;
-  assert.equal(canPlaceCueInD(balls, -3, 0), true);
-  assert.equal(canPlaceCueInD(balls, BAULK.x, -0.25), true, 'the line counts as in D when clear of brown');
+  assert.equal(canPlaceCueOnTable(balls, -3, 0), true);
+  assert.equal(canPlaceCueOnTable(balls, 0, -1.2), true, 'not restricted to the D');
   for (const [x, z] of [
-    [BAULK.x + 0.01, 0], [BAULK.x - 0.6, 0.6],
-    [NaN, 0], [Infinity, 0], [0, 0],
-  ]) assert.equal(canPlaceCueInD(balls, x, z), false, 'outside D or nonfinite');
+    [TABLE.halfX, 0], [0, TABLE.halfZ], [NaN, 0], [Infinity, 0],
+    [RACK_APEX.x, 0],
+  ]) assert.equal(canPlaceCueOnTable(balls, x, z), false);
   balls[1].x = -3;
   balls[1].z = 0;
-  assert.equal(canPlaceCueInD(balls, -3, 0), false, 'no overlaps');
-  assert.equal(respawnCue(balls, -3, 0), false, 'illegal placement leaves white in hand');
-  assert.equal(cue.pocketed, true);
+  assert.equal(canPlaceCueOnTable(balls, -3, 0), false, 'cannot overlap');
+  assert.equal(respawnCue(balls, -3, 0), false);
   balls[1].vx = 0.2;
-  assert.equal(canPlaceCueInD(balls, -2.9, -0.3), false, 'wait for all balls to stop');
+  assert.equal(canPlaceCueOnTable(balls, -2.9, -0.3), false, 'wait until still');
   balls[1].vx = 0;
   cue.spinVx = 3;
-  cue.spinVz = -2;
-  assert.equal(respawnCue(balls, -2.9, -0.3), true, 'user chooses valid free point');
-  assert.equal(cue.x, -2.9);
-  assert.equal(cue.z, -0.3);
+  assert.equal(respawnCue(balls, 0, -1.2), true);
+  assert.deepEqual([cue.x, cue.z], [0, -1.2]);
   assert.equal(cue.pocketed, false);
   assert.equal(cue.spinVx, 0);
-  assert.equal(cue.spinVz, 0);
-  assert.equal(respawnCue(balls, -3, 0), false, 'cannot reposition the live white');
+  assert.equal(respawnCue(balls, -3, 0), false, 'cannot move a live cue');
 });
 
-test('keyboard fallback finds a legal nonoverlapping D position, or waits', () => {
+test('keyboard ball-in-hand fallback avoids occupied head spot', () => {
   const balls = createRack();
   const cue = balls[0];
   cue.pocketed = true;
-  balls[1].x = BAULK.x - 0.45;
-  balls[1].z = 0;
+  balls[1].x = CUE_START.x;
+  balls[1].z = CUE_START.z;
   balls[1].vx = 1;
-  assert.equal(respawnCue(balls), false, 'never respawn during another shot');
+  assert.equal(respawnCue(balls), false, 'cannot place while moving');
   balls[1].vx = 0;
   assert.equal(respawnCue(balls), true);
-  assert.ok(cue.x <= BAULK.x);
-  assert.ok(Math.hypot(cue.x - BAULK.x, cue.z) <= BAULK.radius + 1e-9);
+  assert.ok(Math.abs(cue.x) < TABLE.halfX - TABLE.ballRadius);
   assert.ok(Math.hypot(cue.x - balls[1].x, cue.z - balls[1].z) >= 2 * TABLE.ballRadius);
 });
 

@@ -3,9 +3,9 @@
 export const TABLE = Object.freeze({
   halfX: 4.35,
   halfZ: 2.15,
-  // Slightly larger than regulation relative to our table so balls stay
-  // readable at a 390px mobile width. Previous 0.105 looked pool-sized.
-  ballRadius: 0.075,
+  // Approximate American pool ball/table proportions, while keeping the
+  // balls legible on phone-sized 3D canvases.
+  ballRadius: 0.095,
   // Capture radii match the visible mouths. Middle pockets are a little more
   // forgiving; these are tuned game approximations, not WPBSA pocket templates.
   pocketRadius: 0.175,
@@ -19,8 +19,9 @@ export const TABLE = Object.freeze({
   cueSpinTransferRate: 5.0,
 });
 
-// Fifteen reds and six colours, plus the white cue ball. Practice rules remain free-play.
-export const OBJECT_BALL_COUNT = 21;
+// American eight-ball opening rack: seven solids, seven stripes, the black
+// eight ball and the white cue ball. Free practice, not turn-based 8-ball yet.
+export const OBJECT_BALL_COUNT = 15;
 
 export const POCKETS = Object.freeze([
   [-4.33, -2.15, TABLE.pocketRadius], [0, -2.18, TABLE.middlePocketRadius], [4.33, -2.15, TABLE.pocketRadius],
@@ -52,43 +53,38 @@ export const POCKET_JAWS = Object.freeze(POCKETS.flatMap(([px, pz]) => {
   ];
 }));
 
-// The cloth markings and opening rack use the same physical spots.
-// Colour respotting is handled by the separate free-practice shot-end policy.
-export const BAULK = Object.freeze({ x: -2.55, radius: 0.71 });
-export const COLOUR_SPOTS = Object.freeze([
-  Object.freeze({ id: 16, x: BAULK.x, z: BAULK.radius }),  // Yellow
-  Object.freeze({ id: 17, x: BAULK.x, z: -BAULK.radius }), // Green
-  Object.freeze({ id: 18, x: BAULK.x, z: 0 }),             // Brown
-  Object.freeze({ id: 19, x: 0, z: 0 }),                   // Blue
-  Object.freeze({ id: 20, x: 1.23, z: 0 }),                // Pink
-  Object.freeze({ id: 21, x: 3.36, z: 0 }),                // Black
-]);
+// Opening cue lies on the head string, centred across the table. The rack
+// apex lies on the foot spot. This replaces snooker's baulk/D/colour spots.
+export const CUE_START = Object.freeze({ x: -2.40, z: 0 });
+export const RACK_APEX = Object.freeze({ x: 2.05, z: 0 });
 
 export function createRack() {
-  const r = TABLE.ballRadius;
-  const gap = 2 * r + 0.008;
-  const redApexX = COLOUR_SPOTS.find((spot) => spot.id === 20).x + gap;
+  const gap = 2 * TABLE.ballRadius + 0.006;
   const balls = [{
-    id: 0, number: 0, x: -2.9, z: 0.38, vx: 0, vz: 0, pocketed: false,
+    id: 0, number: 0, x: CUE_START.x, z: CUE_START.z,
+    vx: 0, vz: 0, pocketed: false,
   }];
 
-  // Snooker starts with a five-row pyramid of 15 reds behind the pink spot.
-  let redId = 1;
-  for (let row = 0; row < 5; row++) {
-    for (let col = 0; col <= row; col++) {
+  // Deterministic five-row pool triangle. The eight is in the centre of
+  // row three; the two back corners hold one stripe and one solid.
+  // Never duplicate or omit a numbered ball.
+  const rows = [
+    [1],
+    [10, 2],
+    [3, 8, 11],
+    [12, 4, 13, 5],
+    [9, 6, 14, 15, 7],
+  ];
+  for (let row = 0; row < rows.length; row++) {
+    for (let col = 0; col < rows[row].length; col++) {
+      const id = rows[row][col];
       balls.push({
-        id: redId, number: redId++,
-        x: redApexX + row * gap * Math.sqrt(3) / 2,
+        id, number: id,
+        x: RACK_APEX.x + row * gap * Math.sqrt(3) / 2,
         z: (col - row / 2) * gap,
         vx: 0, vz: 0, pocketed: false,
       });
     }
-  }
-
-  // Baulk colours, blue centre, pink in front of the reds and black behind.
-  // These are practice-ball identities; scoring/respots are not yet official rules.
-  for (const { id, x, z } of COLOUR_SPOTS) {
-    balls.push({ id, number: id, x, z, vx: 0, vz: 0, pocketed: false });
   }
   return balls;
 }
@@ -240,35 +236,37 @@ function capturePocket(ball, events) {
   return false;
 }
 
-// A scratched white is in hand: its CENTRE must lie in the baulk D,
-// away from all other balls. Keep this rule independent of Three.js/input.
-export function canPlaceCueInD(balls, x, z) {
+// In pool free practice, a scratched white is ball-in-hand anywhere on the
+// playing cloth, not confined to snooker's D. Movement must have stopped and
+// the chosen position may not overlap an object ball or a pocket.
+export function canPlaceCueOnTable(balls, x, z) {
   const cue = balls.find((b) => b.id === 0);
   if (!cue?.pocketed || ballsMoving(balls) ||
       !Number.isFinite(x) || !Number.isFinite(z)) return false;
-  if (x > BAULK.x + 1e-9 ||
-      Math.hypot(x - BAULK.x, z) > BAULK.radius + 1e-9) return false;
   if (Math.abs(x) > TABLE.halfX - TABLE.ballRadius ||
       Math.abs(z) > TABLE.halfZ - TABLE.ballRadius) return false;
+  if (POCKETS.some(([px, pz, radius]) =>
+    Math.hypot(px - x, pz - z) < radius + TABLE.ballRadius)) return false;
   return balls.every((b) => b.id === 0 || b.pocketed ||
     Math.hypot(b.x - x, b.z - z) >= 2 * TABLE.ballRadius + 0.004);
 }
 
-// Explicit x/z places the white exactly where the player chooses.
-// Without coordinates, choose a legal point inside D for keyboard users.
 export function respawnCue(balls, x, z) {
   const cue = balls.find((b) => b.id === 0);
   if (!cue) return false;
   const put = (px, pz) => {
-    if (!canPlaceCueInD(balls, px, pz)) return false;
+    if (!canPlaceCueOnTable(balls, px, pz)) return false;
     Object.assign(cue, { x: px, z: pz, vx: 0, vz: 0,
       spinVx: 0, spinVz: 0, pocketed: false });
     return true;
   };
   if (x !== undefined || z !== undefined) return put(x, z);
-  for (const offset of [0.45, 0.3, 0.15, 0.6, 0]) {
-    for (const zz of [0, 0.2, -0.2, 0.4, -0.4, 0.6, -0.6]) {
-      if (put(BAULK.x - offset, zz)) return true;
+
+  // Accessible keyboard fallback: favour the original centred head spot,
+  // then deterministic nearby grid locations. Never force an overlap.
+  for (const px of [CUE_START.x, -2.8, -2.0, -3.2, -1.6, -3.6, -1.2, 0]) {
+    for (const pz of [0, 0.32, -0.32, 0.64, -0.64, 0.96, -0.96]) {
+      if (put(px, pz)) return true;
     }
   }
   return false;
