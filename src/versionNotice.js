@@ -13,15 +13,44 @@ export function trustedRelease(value) {
     typeof value.source_sha === 'string' && SHA.test(value.source_sha));
 }
 
+const ISSUER = 'https://id-staging.shadowops.dpdns.org';
+
+async function renewSession(fetcher) {
+  // The edge's __Host- cookie is intentionally short-lived. Reuse its
+  // existing signed-in Identity flow; the browser never persists the token.
+  // If the user is logged out or revoked, Identity/edge deny the renewal.
+  const auth = await fetcher(ISSUER + '/api/identity/token', {
+    method: 'POST', credentials: 'include', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json' }, body: '{}',
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!auth.ok) return false;
+  const value = await auth.json();
+  if (!value || typeof value.token !== 'string' ||
+      value.token.length === 0 || value.token.length > 8192) return false;
+  const session = await fetcher('/api/snooker/session', {
+    method: 'POST', credentials: 'same-origin', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: value.token }),
+    signal: AbortSignal.timeout(6000),
+  });
+  return session.ok;
+}
+
 export async function readDeployedRelease(fetcher = fetch) {
-  // Authenticated same-origin JSON only. Local Vite development has no
-  // release.json, so a 404 or login response is silently treated as unknown.
-  const response = await fetcher('/release.json', {
-    credentials: 'same-origin',
-    cache: 'no-store',
+  // Only protected same-origin JSON; local Vite 404 stays silent. The
+  // one-time 401 recovery restores a still-valid Identity session so a tab
+  // left open for hours can detect newer deployments. No blind retries.
+  const request = () => fetcher('/release.json', {
+    credentials: 'same-origin', cache: 'no-store',
     headers: { Accept: 'application/json' },
     signal: AbortSignal.timeout(6000),
   });
+  let response = await request();
+  if (response.status === 401) {
+    if (!await renewSession(fetcher)) return null;
+    response = await request();
+  }
   if (!response.ok || !response.headers.get('content-type')?.toLowerCase().includes('application/json')) {
     return null;
   }
