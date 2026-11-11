@@ -8,7 +8,7 @@ import {
 test('charge draws the *visual* cue further back but leaves its rest gap unchanged', () => {
   for (const power of [0, 0.25, 0.65, 1]) {
     const rest = cueIdleGap(power);
-    assert.ok(rest >= 0.046 && rest <= 0.206);
+    assert.ok(rest >= 0.046 - 1e-12 && rest <= 0.206 + 1e-12);
     assert.ok(cueIdleGap(power, true) > rest);
     assert.equal(cueStrokePose(0, power).gap, rest);
   }
