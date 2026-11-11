@@ -242,6 +242,49 @@ try {
       'new-release banner does not discard the game');
     await page.locator('#update-later').click();
     assert.equal(await page.locator('#update-banner').isHidden(), true);
+    // The optional local match must not disturb the normal practice golden path.
+    const matchStatus = page.locator('#match-status');
+    assert.equal(await matchStatus.isHidden(), true);
+    await page.locator('#mode-versus').click();
+    assert.equal(await page.locator('#mode-versus').getAttribute('aria-pressed'), 'true');
+    assert.equal(await matchStatus.isVisible(), true);
+    assert.match(await matchStatus.innerText(), /Jugador 1.*Saque/);
+    assert.equal(await page.locator('#shots').innerText(), '00', 'mode switch resets rack');
+    assert.equal(await page.locator('#viewport').getAttribute('data-game-mode'), 'versus');
+    // A low-power stroke reliably stops quickly on software WebGL CI.
+    // The cue cannot reach the distant rack: it must be adjudicated as an
+    // illegal no-contact break, awarding the second player ball-in-hand.
+    await page.locator('#power').evaluate((input) => {
+      input.value = '5';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.locator('#strike').click();
+    await page.waitForFunction(() =>
+      document.querySelector('#match-status')?.dataset.shots === '1',
+      undefined, { timeout: 25000 });
+    assert.equal(await page.locator('#shots').innerText(), '01');
+    assert.match(await matchStatus.innerText(), /Jugador [12]/);
+    assert.equal(await matchStatus.getAttribute('data-outcome'), 'foul',
+      'short no-contact break is a real foul');
+    assert.equal(await matchStatus.getAttribute('data-turn'), '2');
+    assert.equal(await page.locator('#viewport').getAttribute('data-cue-placement'), 'required');
+    if (config.isMobile) {
+      const pair = await page.evaluate(() => ({
+        camera: document.querySelector('.camera-switch').getBoundingClientRect().toJSON(),
+        modes: document.querySelector('.mode-switch').getBoundingClientRect().toJSON(),
+      }));
+      assert.ok(!overlaps(pair.camera, pair.modes), 'mobile mode controls do not cover camera controls');
+    }
+    await page.screenshot({
+      path: 'artifacts/billiards-' + config.name + '-two-player.png',
+      fullPage: true, animations: 'disabled',
+    });
+    await page.locator('#mode-practice').click();
+    await page.waitForFunction(() =>
+      document.querySelector('#shots')?.textContent === '00');
+    assert.equal(await matchStatus.isHidden(), true);
+    assert.equal(await page.locator('#viewport').getAttribute('data-game-mode'), 'practice');
+    assert.equal(await page.locator('#shots').innerText(), '00', 'practice reset is explicit');
     assert.deepEqual(errors, [], config.name + ' browser runtime errors');
     console.log('SNOOKER_BROWSER_' + config.name.toUpperCase() + '_PASS', dimensions);
     await context.close();
