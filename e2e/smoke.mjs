@@ -28,7 +28,7 @@ try {
     );
     assert.ok(dimensions.w >= 350 && dimensions.h >= 500, '3D canvas should have dimensions');
     assert.equal(await page.locator('#shots').innerText(), '00');
-    assert.match(await page.locator('#potted').innerText(), /21 en mesa/, 'snooker starts with 21 objects remaining');
+    assert.match(await page.locator('#potted').innerText(), /15 en mesa/, 'pool starts with 15 objects remaining');
     assert.equal(await page.locator('#viewport').getAttribute('data-camera'), 'top');
     assert.equal(await page.locator('#camera-top').getAttribute('aria-pressed'), 'true');
     const layout = await page.evaluate(() => {
@@ -69,9 +69,9 @@ try {
     await selectSpin();
     assert.equal(await spinControl.getAttribute('data-spin'), '1');
     assert.equal(await page.locator('#shots').innerText(), '00', 'spin choice never fires a shot');
-    // Point at the brown spot from the opening cue position. Project known
+    // Point at the apex of the pool triangle from the centred cue position. Project known
     // world coordinates through the same orthographic framing in both sizes.
-    const brownScreen = await page.locator('#viewport canvas').evaluate((canvas) => {
+    const rackScreen = await page.locator('#viewport canvas').evaluate((canvas) => {
       const rect = canvas.getBoundingClientRect();
       const aspect = rect.width / rect.height;
       const portrait = rect.width <= 700 && rect.height > rect.width * 1.15;
@@ -79,15 +79,15 @@ try {
       const halfWorldHeight = portrait ? 4.75 : 2.51;
       const halfHeight = Math.max(halfWorldHeight / 0.89, halfWorldWidth / (aspect * 0.89));
       const scale = rect.height / (2 * halfHeight);
-      const brownX = -2.55, brownZ = 0;
+      const rackX = 2.05, rackZ = 0;
       return portrait
-        ? { x: rect.left + rect.width / 2 + brownZ * scale,
-            y: rect.top + rect.height / 2 - brownX * scale }
-        : { x: rect.left + rect.width / 2 + brownX * scale,
-            y: rect.top + rect.height / 2 + brownZ * scale };
+        ? { x: rect.left + rect.width / 2 + rackZ * scale,
+            y: rect.top + rect.height / 2 - rackX * scale }
+        : { x: rect.left + rect.width / 2 + rackX * scale,
+            y: rect.top + rect.height / 2 + rackZ * scale };
     });
-    await page.mouse.move(brownScreen.x, brownScreen.y);
-    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '18');
+    await page.mouse.move(rackScreen.x, rackScreen.y);
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
     // The actual opening rack offers a clear line towards the upper-left
     // corner's long-rail jaw. The guide must now identify that physical jaw.
     const jawScreen = await page.locator('#viewport canvas').evaluate((canvas) => {
@@ -113,8 +113,8 @@ try {
       path: 'artifacts/snooker-' + config.name + '-jaw-guide.png', fullPage: true,
       animations: 'disabled',
     });
-    await page.mouse.move(brownScreen.x, brownScreen.y);
-    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '18');
+    await page.mouse.move(rackScreen.x, rackScreen.y);
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
     assert.equal(await page.locator('#viewport').getAttribute('data-aim-jaw'), '',
       'direct re-aiming clears the previous jaw highlight');
     if (config.isMobile) {
@@ -127,9 +127,9 @@ try {
       await page.locator('#fine-left').tap();
       assert.equal(await page.locator('#fine-angle').innerText(), '−0,5°');
       // A fresh pointer aim is the new baseline. Controls never change the score.
-      await page.mouse.move(brownScreen.x + 1, brownScreen.y);
+      await page.mouse.move(rackScreen.x + 1, rackScreen.y);
       await page.waitForFunction(() => document.querySelector('#fine-angle')?.textContent === '0,0°');
-      await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '18');
+      await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
       await page.locator('#fine-right').tap();
       assert.equal(await page.locator('#fine-angle').innerText(), '+0,5°');
     }
@@ -140,7 +140,7 @@ try {
     await page.locator('#camera-3d').click();
     assert.equal(await page.locator('#viewport').getAttribute('data-camera'), '3d');
     assert.equal(await page.locator('#camera-3d').getAttribute('aria-pressed'), 'true');
-    assert.equal(await page.locator('#viewport').getAttribute('data-aim-target'), '18',
+    assert.equal(await page.locator('#viewport').getAttribute('data-aim-target'), '1',
       'camera switch preserves predicted first contact');
     await page.screenshot({
       path: 'artifacts/snooker-' + config.name + '-3d.png', fullPage: true,
@@ -206,107 +206,15 @@ try {
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
     await page.locator('#restart').click();
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');
-    // The real rendered table must let a scratched white be placed inside D
-    // with desktop pointer or mobile touch, never on top of another ball.
-    const dScreens = await page.locator('#viewport canvas').evaluate((canvas) => {
-      const rect = canvas.getBoundingClientRect();
-      const aspect = rect.width / rect.height;
-      const portrait = rect.width <= 700 && rect.height > rect.width * 1.15;
-      const halfHeight = Math.max((portrait ? 4.75 : 2.51) / 0.89,
-        (portrait ? 2.51 : 4.75) / (aspect * 0.89));
-      const scale = rect.height / (2 * halfHeight);
-      const screen = (x, z) => portrait
-        ? { x: rect.left + rect.width / 2 + z * scale,
-            y: rect.top + rect.height / 2 - x * scale }
-        : { x: rect.left + rect.width / 2 + x * scale,
-            y: rect.top + rect.height / 2 + z * scale };
-      return {
-        // 128° from the initial white: verified against the real 120 Hz engine
-        // to scratch consistently without being rejected by a pocket jaw.
-        pocket: screen(-2.9 + 2 * Math.cos(128 * Math.PI / 180),
-          0.38 + 2 * Math.sin(128 * Math.PI / 180)),
-        outside: screen(-2.05, 0),
-        occupied: screen(-2.55, 0),
-        inside: screen(-3.0, 0),
-      };
-    });
-    // Prior charge tests intentionally leave the slider at another value.
-    // Reset this scenario's shot power: its 128° scratch is calibrated to 55%.
-    await page.locator('#power').evaluate((el) => {
-      el.value = '55';
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    assert.equal(await page.locator('#power-value').innerText(), '55%');
-    await page.mouse.move(dScreens.pocket.x, dScreens.pocket.y);
-    if (config.isMobile) await page.locator('#strike').tap();
-    else await page.locator('#strike').click();
-    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.cuePlacement === 'required',
-      undefined, { timeout: 15000 });
-    await page.waitForFunction(() => !document.querySelector('#strike')?.disabled,
-      undefined, { timeout: 15000 });
-    assert.match(await page.locator('#strike').innerText(), /COLOCAR/,
-      'scratch changes shot control to accessible cue placement');
-    const touchOrClick = async (p) => {
-      if (config.isMobile) await page.touchscreen.tap(p.x, p.y);
-      else await page.mouse.click(p.x, p.y);
-    };
-    await touchOrClick(dScreens.outside);
-    assert.equal(await page.locator('#viewport').getAttribute('data-cue-placement'), 'required',
-      'cannot place outside the D');
-    await touchOrClick(dScreens.occupied);
-    assert.equal(await page.locator('#viewport').getAttribute('data-cue-placement'), 'required',
-      'cannot overlap the brown ball');
-    await page.screenshot({
-      path: 'artifacts/snooker-' + config.name + '-cue-in-hand.png', fullPage: true,
-      animations: 'disabled',
-    });
-    await touchOrClick(dScreens.inside);
-    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.cuePlacement === '');
-    assert.match(await page.locator('#strike').innerText(), /GOLPEAR/);
-    assert.equal(await page.locator('#shots').innerText(), '01',
-      'moving the white back into D must not count as another shot');
+    // The break actually changes shot state; restart restores the entire
+    // fifteen-ball pool rack with no red/colour respotting phase.
     await page.locator('#restart').click();
-    await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');
-    // Drive a real opening-rack pot: 33 degrees, 70% power pockets yellow.
-    // Physics settles before the coloured ball returns (without losing any reds).
-    const yellowShot = await page.locator('#viewport canvas').evaluate((canvas) => {
-      const rect = canvas.getBoundingClientRect();
-      const aspect = rect.width / rect.height;
-      const portrait = rect.width <= 700 && rect.height > rect.width * 1.15;
-      const halfHeight = Math.max((portrait ? 4.75 : 2.51) / 0.89,
-        (portrait ? 2.51 : 4.75) / (aspect * 0.89));
-      const scale = rect.height / (2 * halfHeight);
-      const x = -2.9 + 2 * Math.cos(33 * Math.PI / 180);
-      const z = 0.38 + 2 * Math.sin(33 * Math.PI / 180);
-      return portrait
-        ? { x: rect.left + rect.width / 2 + z * scale,
-            y: rect.top + rect.height / 2 - x * scale }
-        : { x: rect.left + rect.width / 2 + x * scale,
-            y: rect.top + rect.height / 2 + z * scale };
-    });
-    await page.locator('#power').evaluate((el) => {
-      el.value = '70';
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    await page.mouse.move(yellowShot.x, yellowShot.y);
-    if (config.isMobile) await page.locator('#strike').tap();
-    else await page.locator('#strike').click();
-    await page.waitForFunction(() => {
-      const pocketCount = document.querySelector('#potted')?.textContent || '';
-      return pocketCount.trim().startsWith('01') &&
-        pocketCount.includes('21 en mesa') &&
-        !document.querySelector('#strike')?.disabled &&
-        (document.querySelector('#commentary')?.textContent || '').includes('amarilla');
-    }, undefined, { timeout: 20000 });
-    assert.equal(await page.locator('#shots').innerText(), '01');
-    await page.screenshot({
-      path: 'artifacts/snooker-' + config.name + '-yellow-respot.png',
-      fullPage: true, animations: 'disabled',
-    });
-    await page.locator('#restart').click();
-    await page.waitForFunction(() => /^00.*21 en mesa/s.test(
-      document.querySelector('#potted')?.textContent || ''));
-    assert.match(await page.locator('#potted').innerText(), /00.*21 en mesa/s);
+    await page.waitForFunction(() =>
+      document.querySelector('#shots')?.textContent === '00' &&
+      (document.querySelector('#potted')?.textContent || '').includes('15 en mesa'));
+    assert.match(await page.locator('#potted').innerText(), /00.*15 en mesa/s);
+    assert.match(await page.locator('.brand').innerText(), /BILLIARDS OF MATTHIAS/);
+    assert.match(await page.locator('.table-label').innerText(), /POOL 8-BALL/);
     assert.deepEqual(errors, [], config.name + ' browser runtime errors');
     console.log('SNOOKER_BROWSER_' + config.name.toUpperCase() + '_PASS', dimensions);
     await context.close();
