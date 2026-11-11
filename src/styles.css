@@ -468,3 +468,28 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
     left: auto;
   }
 }
+
+/* First-contact number magnifier, shown only during deliberate aim on a
+   portrait phone. Reserve the cloth for play; use its empty side gutters. */
+.target-lens { display: none; position: absolute; z-index: 2; width: 66px;
+  justify-items: center; gap: 3px; pointer-events: none; user-select: none;
+  filter: drop-shadow(0 4px 7px #020c0bb0); }
+.target-lens[hidden] { display: none !important; }
+.target-lens[data-side="left"] { left: 4px; }
+.target-lens[data-side="right"] { right: 4px; }
+.target-ball { display: grid; place-items: center; width: 47px; height: 47px;
+  border-radius: 50%; border: 2px solid #fffae8b8;
+  background: radial-gradient(circle at 30% 22%, #ffffff65, transparent 45%), var(--ball-color);
+  box-shadow: inset -5px -5px 10px #0005, 0 1px 5px #000a; }
+.target-lens[data-striped="true"] .target-ball {
+  background: linear-gradient(to bottom, #f9f7ed 0 27%, var(--ball-color) 27% 73%, #f9f7ed 73%); }
+#target-ball-number { display: grid; place-items: center; width: 26px; height: 26px;
+  border-radius: 50%; background: #fffcf0; color: #1e2928;
+  border: 1px solid #d7d2c4; font: 900 14px/1 Manrope, sans-serif;
+  font-variant-numeric: tabular-nums; }
+.target-lens-label { color: #e8c98b; background: #071c1bc9; padding: 2px 3px;
+  border-radius: 4px; font: 800 8px/1.25 'DM Sans', sans-serif;
+  letter-spacing: .035em; white-space: nowrap; }
+@media (max-width: 700px) and (min-height: 700px) {
+  .target-lens:not([hidden]) { display: grid; }
+}

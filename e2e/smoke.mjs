@@ -134,6 +134,22 @@ try {
     });
     await page.mouse.move(rackScreen.x, rackScreen.y);
     await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
+    const lens = page.locator('#target-lens');
+    if (config.isMobile) {
+      await lens.waitFor({ state: 'visible' });
+      assert.equal(await lens.getAttribute('data-ball-id'), '1',
+        'the magnifier must identify the real predicted first contact');
+      assert.match(await lens.innerText(), /01/);
+      assert.equal(await lens.getAttribute('data-striped'), 'false');
+      const targetBounds = await lens.boundingBox();
+      const viewportBounds = await page.locator('#viewport').boundingBox();
+      assert.ok(targetBounds.x >= viewportBounds.x && targetBounds.x + targetBounds.width <= viewportBounds.x + viewportBounds.width,
+        'mobile lens stays inside the viewport gutter');
+      assert.equal(await lens.evaluate((el) => getComputedStyle(el).pointerEvents), 'none',
+        'lens may never block touch aiming');
+    } else {
+      assert.equal(await lens.isVisible(), false, 'desktop keeps its uncluttered table');
+    }
     // The actual opening rack offers a clear line towards the upper-left
     // corner's long-rail jaw. The guide must now identify that physical jaw.
     const jawScreen = await page.locator('#viewport canvas').evaluate((canvas) => {
@@ -153,6 +169,8 @@ try {
     });
     await page.mouse.move(jawScreen.x, jawScreen.y);
     await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimJaw !== '');
+    assert.equal(await lens.isVisible(), false,
+      'the first-contact magnifier never invents a ball when aiming at a jaw');
     assert.equal(await page.locator('#viewport').getAttribute('data-aim-target'), '',
       'a jaw hit must not be incorrectly marked as a ball hit');
     await page.screenshot({
@@ -208,6 +226,7 @@ try {
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
     await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '',
       undefined, { timeout: 5000 });
+    assert.equal(await lens.isVisible(), false, 'contact lens hides during a real shot');
     assert.equal(await spinControl.isDisabled(), true, 'cannot change spin while the balls roll');
     if (config.isMobile) assert.equal(await page.locator('#fine-right').isDisabled(), true,
       'fine aim is disabled while balls move');
