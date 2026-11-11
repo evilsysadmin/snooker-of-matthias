@@ -306,3 +306,42 @@ test('cue spin cannot survive a scratch or be applied to respawned white', () =>
   assert.equal(balls[0].spinVx, 0);
   assert.equal(balls[0].spinVz, 0);
 });
+
+test('optional shot telemetry records cue first contact without changing legacy simulation', () => {
+  const balls = [
+    { id: 0, x: -(TABLE.ballRadius * 2 + 0.01), z: 0, vx: 4, vz: 0, pocketed: false },
+    { id: 1, x: 0, z: 0, vx: 0, vz: 0, pocketed: false },
+  ];
+  const events = stepPhysics(balls, 1 / 120, { trackContacts: true });
+  assert.deepEqual(events.filter((event) => event.type === 'contact'),
+    [{ type: 'contact', a: 0, b: 1 }]);
+  assert.ok(balls[1].vx > 3.5);
+});
+
+test('rail telemetry counts only incoming collisions, not travel along cushion', () => {
+  const ball = {
+    id: 6, x: TABLE.halfX - TABLE.ballRadius - 0.001, z: 0.33,
+    vx: 2, vz: 0, pocketed: false,
+  };
+  const events = stepPhysics([ball], 1 / 120, { trackContacts: true });
+  assert.deepEqual(events.filter((event) => event.type === 'rail'),
+    [{ type: 'rail', id: 6 }]);
+  assert.ok(ball.vx < 0);
+  const second = stepPhysics([ball], 1 / 120, { trackContacts: true });
+  assert.deepEqual(second.filter((event) => event.type === 'rail'), []);
+});
+
+test('pocket telemetry records exact pocket index for future called-eight rules', () => {
+  const balls = [{ id: 8, x: 4.32, z: 2.12, vx: 0, vz: 0, pocketed: false }];
+  const events = stepPhysics(balls, 1 / 120, { trackContacts: true });
+  assert.deepEqual(events, [{ type: 'potted', id: 8, pocket: 5 }]);
+});
+
+test('contact and rail telemetry are opt-in; existing callers stay compatible', () => {
+  const balls = [
+    { id: 0, x: -(TABLE.ballRadius * 2 + 0.01), z: 0, vx: 4, vz: 0, pocketed: false },
+    { id: 1, x: 0, z: 0, vx: 0, vz: 0, pocketed: false },
+  ];
+  const events = stepPhysics(balls, 1 / 120);
+  assert.deepEqual(events, []);
+});

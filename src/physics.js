@@ -112,7 +112,7 @@ export function strikeCue(balls, dx, dz, power, followDraw = 0) {
   return true;
 }
 
-export function stepPhysics(balls, dt) {
+export function stepPhysics(balls, dt, { trackContacts = false } = {}) {
   if (!Number.isFinite(dt) || dt <= 0 || dt > 1 / 30) {
     throw new RangeError("Physics needs a positive step <= 1/30s");
   }
@@ -144,6 +144,7 @@ export function stepPhysics(balls, dt) {
       b.z = jaw.z + nz * minDistance;
       const normalVelocity = b.vx * nx + b.vz * nz;
       if (normalVelocity < 0) {
+        if (trackContacts && normalVelocity < -0.03) events.push({ type: 'rail', id: b.id });
         b.vx -= (1 + t.jawRestitution) * normalVelocity * nx;
         b.vz -= (1 + t.jawRestitution) * normalVelocity * nz;
       }
@@ -152,10 +153,14 @@ export function stepPhysics(balls, dt) {
     const maxX = t.halfX - r;
     const maxZ = t.halfZ - r;
     if (Math.abs(b.x) > maxX) {
+      if (trackContacts && Math.sign(b.x) * b.vx > 0.03)
+        events.push({ type: 'rail', id: b.id });
       b.x = Math.sign(b.x) * maxX;
       b.vx *= -t.cushionRestitution;
     }
     if (Math.abs(b.z) > maxZ) {
+      if (trackContacts && Math.sign(b.z) * b.vz > 0.03)
+        events.push({ type: 'rail', id: b.id });
       b.z = Math.sign(b.z) * maxZ;
       b.vz *= -t.cushionRestitution;
     }
@@ -195,6 +200,7 @@ export function stepPhysics(balls, dt) {
       const relativeNormal = (b.vx - a.vx) * nx + (b.vz - a.vz) * nz;
       if (relativeNormal >= 0) continue;
       const impulse = -(1 + t.ballRestitution) * relativeNormal / 2;
+      if (trackContacts) events.push({ type: 'contact', a: a.id, b: b.id });
       a.vx -= impulse * nx;
       a.vz -= impulse * nz;
       b.vx += impulse * nx;
@@ -223,13 +229,14 @@ export function stepPhysics(balls, dt) {
 }
 
 function capturePocket(ball, events) {
-  for (const [px, pz, radius] of POCKETS) {
+  for (let pocket = 0; pocket < POCKETS.length; pocket++) {
+    const [px, pz, radius] = POCKETS[pocket];
     if (Math.hypot(ball.x - px, ball.z - pz) < radius) {
       ball.pocketed = true;
       ball.vx = 0;
       ball.vz = 0;
       if (ball.id === 0) { ball.spinVx = 0; ball.spinVz = 0; }
-      events.push({ type: ball.id === 0 ? "scratch" : "potted", id: ball.id });
+      events.push({ type: ball.id === 0 ? "scratch" : "potted", id: ball.id, pocket });
       return true;
     }
   }
