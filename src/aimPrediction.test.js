@@ -66,10 +66,35 @@ test('a ball before the jaw still wins the first-contact preview', () => {
   assert.equal(preview.jawIndex, null);
 });
 
-test('straight middle pocket approach remains unblocked by jaws', () => {
-  const preview = predictFirstContact([cue(0, 1.6)], 0, 1);
-  assert.equal(preview.ballId, null);
+test('direct middle-pocket approaches stop at the real capture mouth before the rail', () => {
+  for (const sign of [-1, 1]) {
+    const balls = [cue(0, sign * 1.6)];
+    const before = structuredClone(balls);
+    const preview = predictFirstContact(balls, 0, sign);
+    assert.equal(preview.ballId, null);
+    assert.equal(preview.jawIndex, null);
+    assert.equal(preview.pocketIndex, sign > 0 ? 4 : 1);
+    const expectedZ = sign * (2.18 - TABLE.middlePocketRadius);
+    assert.ok(Math.abs(preview.z - expectedZ) < 1e-9);
+    assert.ok(Math.abs(preview.z) < TABLE.halfZ - TABLE.ballRadius);
+    assert.deepEqual(balls, before, 'aim preview never mutates the rack');
+  }
+});
+
+test('an object in the pocket lane wins first contact over the later capture', () => {
+  const preview = predictFirstContact([cue(0, 1.6), object(5, 0, 1.85)], 0, 1);
+  assert.equal(preview.ballId, 5);
   assert.equal(preview.jawIndex, null);
+  assert.equal(preview.pocketIndex, null);
+});
+
+test('a grazing approach keeps the jaw/cushion prediction instead of claiming a pot', () => {
+  const jaw = predictFirstContact([cue(0.22, 1.6)], 0, 1);
+  assert.notEqual(jaw.jawIndex, null);
+  assert.equal(jaw.pocketIndex, null);
+  const miss = predictFirstContact([cue(0.45, 1.6)], 0, 1);
+  assert.equal(miss.pocketIndex, null);
+  assert.ok(Math.abs(miss.z - (TABLE.halfZ - TABLE.ballRadius)) < 1e-9);
 });
 
 test('invalid directions and scratched white yield no prediction', () => {
