@@ -264,3 +264,30 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   .solo-status { max-width: min(300px, calc(100vw - 24px)); }
   #viewport[data-game-mode="solo"] ~ .update-banner { top: 171px; }
 }
+
+/* Compact sound control shares the single-player mode pill, not the canvas.
+   It remains reachable at mobile touch sizes and never creates a new HUD row. */
+.mode-switch #sound-toggle {
+  min-width: 36px;
+  width: 36px;
+  min-height: 36px;
+  padding: 0 4px;
+  border-left: 1px solid #afc7b43d;
+  background: #243b36;
+  color: #f5dcaa;
+  font-size: 17px;
+  line-height: 1;
+}
+.mode-switch #sound-toggle[aria-pressed="false"] {
+  background: #142722;
+  color: #9fada2;
+}
+@media (max-width: 700px) {
+  .mode-switch #sound-toggle {
+    width: 33px;
+    min-width: 33px;
+    min-height: 33px;
+    font-size: 15px;
+    padding: 0;
+  }
+}

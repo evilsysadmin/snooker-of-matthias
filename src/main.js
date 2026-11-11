@@ -10,6 +10,7 @@ import { resolveStrokePower } from './strokeInteraction.js';
 import { remainingObjectBalls } from './practiceRules.js';
 import { createVersionWatcher } from './versionNotice.js';
 import { newSoloChallenge, settleSoloShot, readSoloBest, saveSoloBest } from './soloChallenge.js';
+import { createFeedbackGate, createBilliardsAudio } from './shotFeedback.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -19,9 +20,10 @@ app.innerHTML = [
     '<div class="brand"><span class="brand-icon">✦</span><div class="brand-copy">',
       '<small>SHADOWOPS PRESENTA</small><strong>BILLIARDS <em>OF</em> MATTHIAS</strong>',
     '</div></div>',
-    '<div class="mode-switch" role="group" aria-label="Modalidad de billar">',
+    '<div class="mode-switch" role="group" aria-label="Modalidad y efectos sonoros">',
       '<button id="mode-practice" type="button" aria-pressed="true" title="Práctica libre; cambiar reinicia la mesa">Libre</button>',
       '<button id="mode-solo" type="button" aria-pressed="false" title="Desafío individual: emboca las 15 en el menor número de tiros">Desafío 15</button>',
+      '<button id="sound-toggle" class="sound-toggle" type="button" aria-pressed="true" aria-label="Silenciar efectos de sonido" title="Efectos sonoros activados">🔊</button>',
     '</div>',
     '<div class="scoreboard" aria-live="polite">',
       '<div><span>TIROS</span><strong id="shots">00</strong></div>',
@@ -82,6 +84,7 @@ const charge = createShotCharge();
 const modePractice = document.querySelector('#mode-practice');
 const modeSolo = document.querySelector('#mode-solo');
 const soloStatus = document.querySelector('#solo-status');
+const soundToggle = document.querySelector('#sound-toggle');
 const tableLabel = document.querySelector('.table-label');
 const updateBanner = document.querySelector('#update-banner');
 const updateNow = document.querySelector('#update-now');
@@ -183,6 +186,48 @@ for (const [x, z, radius] of POCKETS) {
   lip.rotation.x = -Math.PI / 2;
   lip.position.set(x, 0.066, z);
   scene.add(lip);
+}
+
+// A short, restrained pulse is attached to the *actual* pocket index emitted
+// by the physics. No particles, permanent glows or extra overlay panels.
+const reduceFeedbackMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const pocketPulses = POCKETS.map(([x, z, radius]) => {
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xf2d08c, transparent: true, opacity: 0,
+    depthWrite: false, depthTest: false, side: THREE.DoubleSide,
+  });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(radius + 0.047, 0.014, 6, 40), material);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(x, 0.18, z);
+  ring.renderOrder = 6;
+  ring.visible = false;
+  scene.add(ring);
+  return { ring, at: -Infinity };
+});
+function flashPocket(event, now) {
+  if (!Number.isInteger(event.pocket) || !pocketPulses[event.pocket]) return;
+  const pulse = pocketPulses[event.pocket];
+  pulse.at = now;
+  pulse.ring.material.color.set(event.type === 'scratch' ? 0xd69d85 : 0xf2d08c);
+  pulse.ring.visible = true;
+  pulse.ring.material.opacity = 0.55;
+  pulse.ring.scale.setScalar(1);
+}
+function animatePocketPulses(now) {
+  for (const { ring, at } of pocketPulses) {
+    const age = now - at;
+    const duration = reduceFeedbackMotion ? 150 : 330;
+    if (age < 0 || age >= duration) {
+      ring.visible = false;
+      continue;
+    }
+    ring.visible = true;
+    if (!reduceFeedbackMotion) {
+      const progress = age / duration;
+      ring.scale.setScalar(1 + 0.33 * progress);
+      ring.material.opacity = 0.55 * (1 - progress);
+    }
+  }
 }
 
 // Soft felt-covered shoulders join the existing cushion noses rather than
@@ -373,6 +418,22 @@ let solo = newSoloChallenge(readSoloBest());
 let soloShotEvents = [];
 let soloShotStarted = false;
 let availableUpdate = false;
+const soundFX = createBilliardsAudio();
+const feedbackGate = createFeedbackGate();
+function syncSoundButton() {
+  const enabled = soundFX.isEnabled();
+  soundToggle.dataset.enabled = String(enabled);
+  soundToggle.setAttribute('aria-pressed', String(enabled));
+  soundToggle.setAttribute('aria-label',
+    enabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido');
+  soundToggle.title = enabled ? 'Efectos sonoros activados' : 'Efectos sonoros desactivados';
+  soundToggle.textContent = enabled ? '🔊' : '🔇';
+}
+soundToggle.addEventListener('click', () => {
+  soundFX.setEnabled(!soundFX.isEnabled());
+  syncSoundButton();
+});
+syncSoundButton();
 const versionWatcher = createVersionWatcher({
   isVisible: () => !document.hidden,
   onAvailable: () => {
@@ -473,6 +534,8 @@ function formatScore() {
 }
 function restart() {
   cancelCharge();
+  feedbackGate.reset();
+  for (const pulse of pocketPulses) pulse.ring.visible = false;
   strokeAnimation = null;
   balls = createRack();
   solo = newSoloChallenge(readSoloBest() ?? solo.best);
@@ -507,6 +570,9 @@ function shoot(power = Number(powerInput.value) / 100) {
   const cue = balls[0];
   const shotPosition = { x: cue.x, z: cue.z, dx: aim.x, dz: aim.z };
   if (strikeCue(balls, aim.x, aim.z, power, cueSpin)) {
+    // WebAudio is created only by a real user shot, never at page load.
+    soundFX.unlock();
+    soundFX.play('strike', power);
     if (mode === 'solo') {
       soloShotStarted = true;
       soloShotEvents = [];
@@ -811,9 +877,12 @@ function frame(now) {
   accumulator += elapsed;
   let n = 0;
   while (accumulator >= FIXED_DT && n++ < 7) {
-    const events = stepPhysics(balls, FIXED_DT);
+    const events = stepPhysics(balls, FIXED_DT, { trackContacts: true });
+    for (const feedback of feedbackGate.consume(events, now))
+      soundFX.play(feedback.type, feedback.strength);
     if (mode === 'solo' && soloShotStarted) soloShotEvents.push(...events);
     for (const event of events) {
+      if (event.type === 'scratch' || event.type === 'potted') flashPocket(event, now);
       if (event.type === 'scratch') {
         scratchPending = true;
         placementPrompted = false;
@@ -892,6 +961,7 @@ function frame(now) {
     model.position.set(b.x, TABLE.ballRadius + 0.052, b.z);
   }
   updateCue(now);
+  animatePocketPulses(now);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
