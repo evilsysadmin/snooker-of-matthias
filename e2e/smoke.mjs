@@ -244,6 +244,7 @@ try {
     await page.mouse.down();
     await page.waitForFunction(() => document.querySelector('#strike')?.classList.contains('charging') &&
       Number(document.querySelector('#power')?.value) >= 35);
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.cueCharge === 'active');
     assert.equal(await page.locator('#shots').innerText(), '00', 'holding only charges, no premature shot');
     await page.screenshot({
       path: 'artifacts/snooker-' + config.name + '-charging.png', fullPage: true,
@@ -253,6 +254,8 @@ try {
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
     assert.equal(await page.locator('#strike').evaluate((el) => el.classList.contains('charging')),
       false, 'charging state clears upon release');
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.cueCharge === '');
+    assert.equal(await page.locator('#shots').innerText(), '01', 'visual stroke must not duplicate physics shots');
     await page.locator('#restart').click();
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');
     // Dragging off the button cancels the charge rather than firing unexpectedly.
@@ -264,6 +267,9 @@ try {
     assert.equal(await page.locator('#shots').innerText(), '00', 'release outside cancels');
     assert.equal(await page.locator('#strike').evaluate((el) => el.classList.contains('charging')),
       false, 'cancel clears charging state');
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.cueCharge === '');
+    assert.equal(await page.locator('#shots').innerText(), '00',
+      'cancelled pull-back never sends a hidden impulse');
     if (config.isMobile) assert.equal(await page.locator('#fine-angle').innerText(), '0,0°',
       'restart resets the fine-aim adjustment');
     // Blur the reset button so Space exercises gameplay charge, not native button activation.
