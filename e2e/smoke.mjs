@@ -57,7 +57,12 @@ try {
         'desktop gets a larger table viewport instead of empty vertical bands');
       assert.ok(layout.controls.width >= 1150, 'controls use available desktop width');
     }
-    assert.ok(layout.viewport.bottom <= layout.controls.top + 1, 'table viewport clears controls');
+    assert.ok(layout.viewport.bottom <= layout.controls.top + 1,
+      'table viewport clears controls: ' + JSON.stringify({
+        viewportTop: layout.viewport.top, viewportBottom: layout.viewport.bottom,
+        controlTop: layout.controls.top, controlBottom: layout.controls.bottom,
+        screen: config.viewport,
+      }));
     const overlaps = (a, b) =>
       a.left < b.right - 1 && a.right > b.left + 1 &&
       a.top < b.bottom - 1 && a.bottom > b.top + 1;
