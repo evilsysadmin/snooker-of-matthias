@@ -41,14 +41,19 @@ export const POCKET_JAWS = Object.freeze(POCKETS.flatMap(([px, pz]) => {
     }));
   }
   const sx = Math.sign(px);
+  // Leave a genuine diagonal entrance to each corner. The previous tips
+  // (0.23m back from both rail ends) formed an overlapping collision barrier
+  // across the entire capture mouth: a clean corner shot bounced off the jaws.
+  // Pull the tips just 7cm back; keep their short visible bridges joined to
+  // the cushion noses, with the same radius, pockets and restitution.
   return [
     Object.freeze({
-      x: sx * (TABLE.halfX - 0.23), z: sz * (TABLE.halfZ - 0.045), radius: r,
-      railX: sx * 4.225, railZ: sz * (TABLE.halfZ - 0.005),
+      x: sx * (TABLE.halfX - 0.30), z: sz * (TABLE.halfZ - 0.045), radius: r,
+      railX: sx * (TABLE.halfX - 0.15), railZ: sz * (TABLE.halfZ - 0.005),
     }),
     Object.freeze({
-      x: sx * (TABLE.halfX - 0.05), z: sz * (TABLE.halfZ - 0.23), radius: r,
-      railX: sx * TABLE.halfX, railZ: sz * 1.815,
+      x: sx * (TABLE.halfX - 0.05), z: sz * (TABLE.halfZ - 0.30), radius: r,
+      railX: sx * TABLE.halfX, railZ: sz * (TABLE.halfZ - 0.39),
     }),
   ];
 }));
