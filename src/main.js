@@ -318,7 +318,7 @@ for (const x of [-3.72, 3.72]) for (const z of [-1.64, 1.64]) {
 // Full-curvature enamel colour and properly striped sphere maps.
 // Slightly more tessellation and contact shadows make balls read as polished
 // resin, not flat coloured dots. Never modify the physical ball radius.
-const ballGeo = new THREE.SphereGeometry(TABLE.ballRadius, 40, 32);
+const ballGeo = new THREE.SphereGeometry(TABLE.ballRadius, 32, 24);
 const ballShadowGeo = new THREE.CircleGeometry(TABLE.ballRadius * 1.25, 32);
 const ballShadowMaterial = new THREE.MeshBasicMaterial({
   color: 0x03120e, transparent: true, opacity: 0.18,
@@ -338,12 +338,11 @@ function ballModel(number) {
   group.add(shell);
   if (!spec.cue) {
     const badge = new THREE.Mesh(
-      new THREE.CircleGeometry(TABLE.ballRadius * 0.44, 36),
-      new THREE.MeshPhysicalMaterial({
+      new THREE.CircleGeometry(TABLE.ballRadius * 0.44, 28),
+      new THREE.MeshStandardMaterial({
         map: createNumberTexture(THREE, number),
         transparent: true, depthWrite: false,
-        roughness: 0.18, clearcoat: 0.75,
-        side: THREE.DoubleSide,
+        roughness: 0.2, side: THREE.DoubleSide,
       }),
     );
     badge.rotation.x = -Math.PI / 2;
@@ -889,11 +888,14 @@ let accumulator = 0;
 const FIXED_DT = 1 / 120;
 function frame(now) {
   if (charge.active) paintPower(charge.sample(now) * 100);
-  const elapsed = Math.min((now - lastFrame) / 1000, 0.05);
+  // Keep the *same* deterministic 120 Hz physics while letting simulation
+  // catch up after slower WebGL renders. The previous 50 ms/7-step ceiling
+  // made 2-second strokes last tens of seconds on software GPU and mobile.
+  const elapsed = Math.min((now - lastFrame) / 1000, 0.20);
   lastFrame = now;
   accumulator += elapsed;
   let n = 0;
-  while (accumulator >= FIXED_DT && n++ < 7) {
+  while (accumulator >= FIXED_DT && n++ < 26) {
     const events = stepPhysics(balls, FIXED_DT, { trackContacts: true });
     for (const feedback of feedbackGate.consume(events, now))
       soundFX.play(feedback.type, feedback.strength);
