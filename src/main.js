@@ -466,6 +466,7 @@ function syncMatchUI() {
   matchStatus.dataset.turn = String(match.player + 1);
   matchStatus.dataset.shots = String(match.shots);
   matchStatus.dataset.winner = match.winner === null ? '' : String(match.winner + 1);
+  matchStatus.dataset.outcome = match.last.kind;
   if (two) viewport.dataset.gameMode = 'versus';
   else viewport.dataset.gameMode = 'practice';
 }
@@ -516,6 +517,7 @@ function placeWhiteInHand(x, z) {
   scratchPending = false;
   placementPrompted = false;
   placementCandidate = null;
+  if (mode === 'versus') match = { ...match, ballInHand: false };
   say('Matthias: Blanca colocada. Ahora intenta no volver a perderla.');
   return true;
 }
