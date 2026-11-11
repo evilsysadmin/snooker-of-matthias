@@ -291,3 +291,180 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
     padding: 0;
   }
 }
+
+/* 2026-11-11 approved Billiards of Matthias desktop/portrait canon.
+   Keep native Three.js controls readable, not a picture over the game. */
+.brand-icon {
+  border-color: #d8ac62a0;
+  background: radial-gradient(circle at 35% 25%, #29352d, #102324 70%);
+  color: #f3c77f;
+  box-shadow: inset 0 1px #f8d4a01b, 0 0 22px #cc923514;
+}
+.brand-copy em { color: #dfb674; }
+.scoreboard {
+  border-color: #c4a56854;
+  box-shadow: inset 0 1px #ffe6ba12;
+}
+.table-label, .solo-status {
+  border-color: #cfad6794;
+  background: #0a201df5;
+  box-shadow: 0 3px 15px #0006, inset 0 1px #d1b78017;
+  color: #ecd3a0;
+}
+.table-label-dot { background: #f0c981; box-shadow: 0 0 8px #c38a457c; }
+.camera-switch, .mode-switch {
+  border-color: #afbcac55;
+  box-shadow: inset 0 1px #f8e1b013;
+}
+.camera-option[aria-pressed="true"], .mode-switch button[aria-pressed="true"] {
+  background: linear-gradient(145deg, #f1d395, #d1ab66);
+  box-shadow: inset 0 1px #fff0cc88, 0 0 0 1px #bd8e45b5;
+}
+.bottom-panel {
+  border-color: #c9b27c66;
+  background: linear-gradient(110deg, #102520f2 0%, #0b201df0 56%, #10251ff5 100%);
+  box-shadow: 0 17px 55px #000a, inset 0 1px #f7db9f19;
+}
+.strike {
+  background: linear-gradient(145deg, #f0d29a, #d6ab60);
+  box-shadow: inset 0 1px #fff6dbb8, 0 3px 12px #aa793b48;
+  color: #1b251f;
+}
+.strike:hover:not(:disabled) { background: linear-gradient(145deg, #ffe3a9, #e7bd70); }
+.strike:focus-visible, .fine-step:focus-visible, .restart:focus-visible,
+.spin-cycle:focus-visible, .camera-option:focus-visible, #sound-toggle:focus-visible {
+  outline: 2px solid #f9d18b;
+  outline-offset: 2px;
+}
+.update-banner {
+  z-index: 8;
+  border-color: #ddb36fba;
+  box-shadow: 0 12px 34px #000a, inset 0 1px #f9d69725;
+}
+
+/* Cue-ball spin is visible on the control itself. The dark dot moves between
+   forward/centre/draw, matching the existing unchanged physical spin values. */
+.spin-cycle {
+  min-width: 91px;
+  min-height: 58px;
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: #1b342e;
+  color: #e5d9bd;
+}
+.spin-cycle[data-spin="1"], .spin-cycle[data-spin="-1"] {
+  background: #1c342e;
+  color: #e5d9bd;
+}
+.spin-title {
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: .09em;
+  color: #c5bb9d;
+}
+.spin-disc {
+  position: relative;
+  display: block;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 24%, #ffffff, #eeefe7 42%, #b6c8bd 82%, #6f857a 100%);
+  border: 1px solid #f4efe0c9;
+  box-shadow: inset -3px -3px 7px #66796d55, 0 2px 8px #030c0abb;
+}
+.spin-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #263930;
+  border: 1px solid #fff9d8bb;
+  box-shadow: 0 1px 3px #0007;
+  transition: top .16s ease;
+}
+.spin-cycle[data-spin="1"] .spin-dot { top: 28%; }
+.spin-cycle[data-spin="-1"] .spin-dot { top: 72%; }
+.spin-name { font-size: 9px; line-height: 1; letter-spacing: .03em; }
+@media (prefers-reduced-motion: reduce) {
+  .spin-dot { transition: none; }
+}
+
+/* Wide desktop: the approved mock shows visible fine aim in the main
+   horizontal control rail. Keep it outside the playable canvas. */
+@media (min-width: 1180px) and (min-height: 700px) {
+  .bottom-panel {
+    width: min(1360px, calc(100% - 36px));
+    grid-template-columns: minmax(235px, 310px) minmax(0, 1fr) 215px;
+    gap: 14px;
+    min-height: 97px;
+  }
+  .shot-controls { gap: 11px; min-width: 0; }
+  .power { min-width: 105px; }
+  .fine-aim {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 5px;
+    min-width: 0;
+    padding-left: 10px;
+    border-left: 1px solid #b9b39c3d;
+  }
+  .fine-step {
+    min-width: 57px;
+    min-height: 43px;
+    padding: 0 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border-radius: 9px;
+    border: 1px solid #b3ccac48;
+    background: #2b4841;
+    color: #f1e4cb;
+    font-size: 17px;
+    touch-action: manipulation;
+  }
+  .fine-step span { font-size: 10px; font-variant-numeric: tabular-nums; }
+  .fine-status { min-width: 61px; display: grid; justify-items: center; gap: 4px; }
+  .fine-status small { font-size: 8px; color: #abbcb0; white-space: nowrap; }
+  .fine-status output { font-weight: 800; color: #f4c879; font-variant-numeric: tabular-nums; }
+  .spin-cycle { min-height: 61px; }
+}
+
+/* Portrait: preserve both generous table scale and a full row above the
+   first pocket for the challenge pill. Camera/mode remain tappable. */
+@media (max-width: 700px) {
+  .spin-cycle { min-width: 63px; min-height: 43px; padding: 1px 3px; gap: 1px; }
+  .spin-title { display: none; }
+  .spin-disc { width: 25px; height: 25px; flex-basis: 25px; }
+  .spin-dot { width: 6px; height: 6px; }
+  .spin-name { font-size: 9px; }
+  .bottom-panel { border-color: #b6a37566; }
+  .solo-status {
+    right: 10px;
+    font-size: 10px;
+    border-radius: 12px;
+    max-width: min(300px, calc(100vw - 20px));
+  }
+}
+@media (max-width: 700px) and (min-height: 700px) {
+  #viewport { top: 100px; bottom: 185px; }
+  .solo-status { top: 104px; }
+  /* The manual update action remains accessible and cannot overlap header,
+     fine-aim, camera or strike controls on a phone. */
+  .update-banner, #viewport[data-game-mode="solo"] ~ .update-banner {
+    top: auto;
+    bottom: 195px;
+    right: 10px;
+    left: auto;
+  }
+}
