@@ -164,3 +164,24 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   #viewport { top: 58px; bottom: 150px; }
   .camera-switch { top: 64px; }
 }
+
+/* Wide desktop: one compact control rail below an enlarged playfield.
+   The breakpoints deliberately leave the original stacked/mobile HUD intact. */
+@media (min-width: 1050px) and (min-height: 650px) {
+  #viewport { inset: 92px 0 110px; }
+  .camera-switch { top: 93px; }
+  .table-label { top: 89px; }
+  .bottom-panel {
+    width: min(1220px, calc(100% - 36px));
+    bottom: max(9px, env(safe-area-inset-bottom));
+    padding: 10px 15px;
+    display: grid;
+    grid-template-columns: minmax(265px, 350px) minmax(0, 1fr);
+    align-items: center;
+    gap: 16px;
+  }
+  .commentary { margin-bottom: 0; }
+  .shot-controls { min-width: 0; gap: 13px; }
+  .power { min-width: 120px; }
+  .hint { display: none; }
+}
