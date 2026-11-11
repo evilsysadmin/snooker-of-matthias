@@ -280,6 +280,8 @@ try {
       fullPage: true, animations: 'disabled',
     });
     await page.locator('#mode-practice').click();
+    await page.waitForFunction(() =>
+      document.querySelector('#shots')?.textContent === '00');
     assert.equal(await matchStatus.isHidden(), true);
     assert.equal(await page.locator('#viewport').getAttribute('data-game-mode'), 'practice');
     assert.equal(await page.locator('#shots').innerText(), '00', 'practice reset is explicit');
