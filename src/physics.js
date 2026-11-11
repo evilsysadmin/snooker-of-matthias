@@ -144,7 +144,8 @@ export function stepPhysics(balls, dt, { trackContacts = false } = {}) {
       b.z = jaw.z + nz * minDistance;
       const normalVelocity = b.vx * nx + b.vz * nz;
       if (normalVelocity < 0) {
-        if (trackContacts && normalVelocity < -0.03) events.push({ type: 'rail', id: b.id });
+        if (trackContacts && normalVelocity < -0.03)
+          events.push({ type: 'rail', id: b.id, impactSpeed: -normalVelocity });
         b.vx -= (1 + t.jawRestitution) * normalVelocity * nx;
         b.vz -= (1 + t.jawRestitution) * normalVelocity * nz;
       }
@@ -154,13 +155,13 @@ export function stepPhysics(balls, dt, { trackContacts = false } = {}) {
     const maxZ = t.halfZ - r;
     if (Math.abs(b.x) > maxX) {
       if (trackContacts && Math.sign(b.x) * b.vx > 0.03)
-        events.push({ type: 'rail', id: b.id });
+        events.push({ type: 'rail', id: b.id, impactSpeed: Math.abs(b.vx) });
       b.x = Math.sign(b.x) * maxX;
       b.vx *= -t.cushionRestitution;
     }
     if (Math.abs(b.z) > maxZ) {
       if (trackContacts && Math.sign(b.z) * b.vz > 0.03)
-        events.push({ type: 'rail', id: b.id });
+        events.push({ type: 'rail', id: b.id, impactSpeed: Math.abs(b.vz) });
       b.z = Math.sign(b.z) * maxZ;
       b.vz *= -t.cushionRestitution;
     }
@@ -200,7 +201,8 @@ export function stepPhysics(balls, dt, { trackContacts = false } = {}) {
       const relativeNormal = (b.vx - a.vx) * nx + (b.vz - a.vz) * nz;
       if (relativeNormal >= 0) continue;
       const impulse = -(1 + t.ballRestitution) * relativeNormal / 2;
-      if (trackContacts) events.push({ type: 'contact', a: a.id, b: b.id });
+      if (trackContacts) events.push({ type: 'contact', a: a.id, b: b.id,
+        impactSpeed: -relativeNormal });
       a.vx -= impulse * nx;
       a.vz -= impulse * nz;
       b.vx += impulse * nx;
