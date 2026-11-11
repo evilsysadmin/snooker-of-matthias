@@ -18,7 +18,7 @@ test('American pool balls have exactly one non-striped 8 and unique numbered var
 
 test('rail diamonds are symmetric and never located inside a middle pocket', () => {
   assert.deepEqual([...LONG_RAIL_SIGHTS].reverse(), LONG_RAIL_SIGHTS.map((n) => -n));
-  assert.deepEqual([...SHORT_RAIL_SIGHTS].reverse(), SHORT_RAIL_SIGHTS.map((n) => -n));
+  assert.deepEqual([...SHORT_RAIL_SIGHTS].reverse(), SHORT_RAIL_SIGHTS.map((n) => n === 0 ? 0 : -n));
   assert.ok(LONG_RAIL_SIGHTS.every((x) => Math.abs(x) > 0.5 && Math.abs(x) < 4));
 });
 
