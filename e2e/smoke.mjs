@@ -53,9 +53,9 @@ try {
     });
     assert.ok(layout.viewport.top >= layout.header.bottom - 1, 'table viewport clears header');
     if (!config.isMobile) {
-      assert.ok(layout.viewport.height >= 600,
+      assert.ok(layout.viewport.height >= 680,
         'desktop gets a larger table viewport instead of empty vertical bands');
-      assert.ok(layout.controls.width >= 900, 'controls use available desktop width');
+      assert.ok(layout.controls.width >= 1150, 'controls use available desktop width');
     }
     assert.ok(layout.viewport.bottom <= layout.controls.top + 1, 'table viewport clears controls');
     const overlaps = (a, b) =>
