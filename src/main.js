@@ -9,7 +9,7 @@ import { FINE_AIM_STEP_DEGREES, rotateAim } from './fineAim.js';
 import { resolveStrokePower } from './strokeInteraction.js';
 import { remainingObjectBalls } from './practiceRules.js';
 import { createVersionWatcher } from './versionNotice.js';
-import { newEightBallMatch, adjudicateEightBallShot, groupForBall } from './eightBallRules.js';
+import { newSoloChallenge, settleSoloShot, readSoloBest, saveSoloBest } from './soloChallenge.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -20,8 +20,8 @@ app.innerHTML = [
       '<small>SHADOWOPS PRESENTA</small><strong>BILLIARDS <em>OF</em> MATTHIAS</strong>',
     '</div></div>',
     '<div class="mode-switch" role="group" aria-label="Modalidad de billar">',
-      '<button id="mode-practice" type="button" aria-pressed="true" title="Práctica libre; cambiar reinicia la mesa">Práctica</button>',
-      '<button id="mode-versus" type="button" aria-pressed="false" title="Partida local para dos jugadores; cambiar reinicia la mesa">2 jugadores</button>',
+      '<button id="mode-practice" type="button" aria-pressed="true" title="Práctica libre; cambiar reinicia la mesa">Libre</button>',
+      '<button id="mode-solo" type="button" aria-pressed="false" title="Desafío individual: emboca las 15 en el menor número de tiros">Desafío 15</button>',
     '</div>',
     '<div class="scoreboard" aria-live="polite">',
       '<div><span>TIROS</span><strong id="shots">00</strong></div>',
@@ -30,7 +30,7 @@ app.innerHTML = [
     '</div>',
   '</header>',
   '<div class="table-label"><span class="table-label-dot"></span> POOL 8-BALL · PRÁCTICA LIBRE · 3D ALPHA</div>',
-  '<div id="match-status" class="match-status" role="status" aria-live="polite" hidden></div>',
+  '<div id="solo-status" class="solo-status" role="status" aria-live="polite" hidden></div>',
   '<aside id="update-banner" class="update-banner" role="status" hidden>',
     '<div class="update-copy"><strong>🎱 Nueva versión disponible</strong>',
       '<div>Actualizar reinicia la mesa actual.</div></div>',
@@ -53,17 +53,6 @@ app.innerHTML = [
       '<button id="strike" class="strike" type="button" aria-label="Golpear: toca para usar la potencia elegida, mantén pulsado para cargar" title="Toca para golpear · mantén pulsado para cargar"><span>⚡</span> GOLPEAR <kbd>ESPACIO</kbd></button>',
       '<button id="restart" class="restart" type="button" title="Recolocar las bolas" aria-label="Reiniciar partida">↺</button>',
     '</div>',
-    '<label id="pocket-call-wrap" class="pocket-call" hidden>Tronera de la negra',
-      '<select id="pocket-call" aria-label="Anunciar tronera para la bola ocho">',
-        '<option value="">Elige tronera…</option>',
-        '<option value="0">↖ Esquina superior izquierda</option>',
-        '<option value="1">↑ Centro superior</option>',
-        '<option value="2">↗ Esquina superior derecha</option>',
-        '<option value="3">↙ Esquina inferior izquierda</option>',
-        '<option value="4">↓ Centro inferior</option>',
-        '<option value="5">↘ Esquina inferior derecha</option>',
-      '</select>',
-    '</label>',
     '<p class="hint">Apunta en la mesa. Toca GOLPEAR o mantén para cargar; suelta para tirar. ESPACIO también carga. R reinicia.</p>',
     '<div class="fine-aim" role="group" aria-label="Ajuste fino de puntería">',
       '<button id="fine-left" class="fine-step" type="button" aria-label="Girar puntería 0,5 grados a la izquierda">↶ <span>0,5°</span></button>',
@@ -91,11 +80,9 @@ const fineRight = document.querySelector('#fine-right');
 const fineAngle = document.querySelector('#fine-angle');
 const charge = createShotCharge();
 const modePractice = document.querySelector('#mode-practice');
-const modeVersus = document.querySelector('#mode-versus');
-const matchStatus = document.querySelector('#match-status');
+const modeSolo = document.querySelector('#mode-solo');
+const soloStatus = document.querySelector('#solo-status');
 const tableLabel = document.querySelector('.table-label');
-const pocketCallWrap = document.querySelector('#pocket-call-wrap');
-const pocketCall = document.querySelector('#pocket-call');
 const updateBanner = document.querySelector('#update-banner');
 const updateNow = document.querySelector('#update-now');
 const updateLater = document.querySelector('#update-later');
@@ -381,11 +368,10 @@ let fineAimSteps = 0;
 let cueSpin = 0; // -1: draw, 0: centre, +1: follow
 let pointerStroke = null;
 let strokeAnimation = null;
-let mode = 'practice'; // Opt in to local rules; current practice never changes.
-let match = newEightBallMatch();
-let shotEvents = [];
-let ballsBeforeShot = null;
-let announcedPocket = null;
+let mode = 'practice'; // Solo challenge is opt-in; free practice stays the default.
+let solo = newSoloChallenge(readSoloBest());
+let soloShotEvents = [];
+let soloShotStarted = false;
 let availableUpdate = false;
 const versionWatcher = createVersionWatcher({
   isVisible: () => !document.hidden,
@@ -445,44 +431,41 @@ updateSpinButton();
 
 function say(message) { commentary.textContent = message; }
 
-function needsPocketCall() {
-  if (mode !== 'versus' || match.winner !== null || match.breakShot ||
-      match.groups[match.player] === null) return false;
-  const mine = match.groups[match.player];
-  return balls.every((ball) => ball.pocketed || groupForBall(ball.id) !== mine);
-}
-function syncMatchUI() {
-  const two = mode === 'versus';
-  modePractice.setAttribute('aria-pressed', String(!two));
-  modeVersus.setAttribute('aria-pressed', String(two));
-  matchStatus.hidden = !two;
-  tableLabel.hidden = two;
-  pocketCallWrap.hidden = !needsPocketCall();
-  const group = match.groups[match.player];
-  const type = group === null ? 'Mesa abierta' : group === 'solids' ? 'Lisas' : 'Rayadas';
-  const text = match.winner !== null ? '🏆 Jugador ' + (match.winner + 1) + ' gana'
-    : 'Jugador ' + (match.player + 1) + ' · ' + (match.breakShot ? 'Saque' : type);
-  matchStatus.textContent = text;
-  matchStatus.dataset.turn = String(match.player + 1);
-  matchStatus.dataset.shots = String(match.shots);
-  matchStatus.dataset.winner = match.winner === null ? '' : String(match.winner + 1);
-  matchStatus.dataset.outcome = match.last.kind;
-  if (two) viewport.dataset.gameMode = 'versus';
-  else viewport.dataset.gameMode = 'practice';
+function syncSoloUI() {
+  const challenge = mode === 'solo';
+  modePractice.setAttribute('aria-pressed', String(!challenge));
+  modeSolo.setAttribute('aria-pressed', String(challenge));
+  soloStatus.hidden = !challenge;
+  tableLabel.hidden = challenge;
+  viewport.dataset.gameMode = challenge ? 'solo' : 'practice';
+  if (!challenge) return;
+  const best = solo.best
+    ? 'Récord: ' + solo.best.shots + ' tiros' +
+      (solo.best.scratches ? ' · ' + solo.best.scratches + ' faltas' : '')
+    : 'Sin récord';
+  soloStatus.textContent = solo.completed
+    ? (solo.record ? '🏆 ¡Nuevo récord!' : '✓ Mesa limpia') +
+      ' · ' + solo.shots + ' tiros · ' + best
+    : '🎱 Desafío 15 · ' + solo.remaining + ' restantes · racha ' +
+      solo.streak + ' · ' + best;
+  soloStatus.dataset.shots = String(solo.shots);
+  soloStatus.dataset.remaining = String(solo.remaining);
+  soloStatus.dataset.scratches = String(solo.scratches);
+  soloStatus.dataset.streak = String(solo.streak);
+  soloStatus.dataset.completed = String(solo.completed);
+  soloStatus.dataset.outcome = solo.last.kind;
+  soloStatus.dataset.record = String(solo.record);
 }
 function changeMode(next) {
   if (mode === next || ballsMoving(balls) || charge.active) return;
   mode = next;
   restart();
-  say(next === 'versus'
-    ? 'Matthias: Dos jugadores, un tapete. Saque del jugador 1. Aquí las faltas cuentan.'
+  say(next === 'solo'
+    ? 'Matthias: Quince bolas. ¿Cuántos tiros necesitas para limpiar la mesa?'
     : 'Matthias: Práctica libre. Aquí puedes seguir haciendo el ridículo a tu ritmo.');
 }
 modePractice.addEventListener('click', () => changeMode('practice'));
-modeVersus.addEventListener('click', () => changeMode('versus'));
-pocketCall.addEventListener('change', () => {
-  announcedPocket = pocketCall.value === '' ? null : Number(pocketCall.value);
-});
+modeSolo.addEventListener('click', () => changeMode('solo'));
 function formatScore() {
   shotDisplay.textContent = String(shots).padStart(2, '0');
   pocketDisplay.innerHTML = String(potted).padStart(2, '0') +
@@ -492,11 +475,9 @@ function restart() {
   cancelCharge();
   strokeAnimation = null;
   balls = createRack();
-  match = newEightBallMatch();
-  shotEvents = [];
-  ballsBeforeShot = null;
-  announcedPocket = null;
-  pocketCall.value = '';
+  solo = newSoloChallenge(readSoloBest() ?? solo.best);
+  soloShotEvents = [];
+  soloShotStarted = false;
   shots = 0;
   potted = 0;
   scratchPending = false;
@@ -509,7 +490,7 @@ function restart() {
   setFineAngleDisplay();
   cueSpin = 0;
   updateSpinButton();
-  syncMatchUI();
+  syncSoloUI();
   say('Matthias: Otra oportunidad de desafiar a la geometría. Adelante, campeón.');
 }
 function placeWhiteInHand(x, z) {
@@ -517,19 +498,18 @@ function placeWhiteInHand(x, z) {
   scratchPending = false;
   placementPrompted = false;
   placementCandidate = null;
-  if (mode === 'versus') match = { ...match, ballInHand: false };
+  // The challenge's actual scratch was already counted at shot settle.
   say('Matthias: Blanca colocada. Ahora intenta no volver a perderla.');
   return true;
 }
 function shoot(power = Number(powerInput.value) / 100) {
-  if (mode === 'versus' && (match.winner !== null || (needsPocketCall() && announcedPocket === null))) return;
+  if (mode === 'solo' && solo.completed) return;
   const cue = balls[0];
   const shotPosition = { x: cue.x, z: cue.z, dx: aim.x, dz: aim.z };
-  const before = balls.map((ball) => ({ id: ball.id, pocketed: ball.pocketed }));
   if (strikeCue(balls, aim.x, aim.z, power, cueSpin)) {
-    if (mode === 'versus') {
-      ballsBeforeShot = before;
-      shotEvents = [];
+    if (mode === 'solo') {
+      soloShotStarted = true;
+      soloShotEvents = [];
     }
     strokeAnimation = { ...shotPosition, at: performance.now(), power };
     shots++;
@@ -831,8 +811,8 @@ function frame(now) {
   accumulator += elapsed;
   let n = 0;
   while (accumulator >= FIXED_DT && n++ < 7) {
-    const events = stepPhysics(balls, FIXED_DT, { trackContacts: mode === 'versus' });
-    if (mode === 'versus' && ballsBeforeShot) shotEvents.push(...events);
+    const events = stepPhysics(balls, FIXED_DT);
+    if (mode === 'solo' && soloShotStarted) soloShotEvents.push(...events);
     for (const event of events) {
       if (event.type === 'scratch') {
         scratchPending = true;
@@ -848,40 +828,37 @@ function frame(now) {
     accumulator -= FIXED_DT;
   }
   const nowMoving = ballsMoving(balls);
-  if (!nowMoving && wasMoving && mode === 'versus' && ballsBeforeShot) {
-    match = adjudicateEightBallShot(match, ballsBeforeShot, shotEvents,
-      { calledPocket: announcedPocket });
-    ballsBeforeShot = null;
-    shotEvents = [];
-    announcedPocket = null;
-    pocketCall.value = '';
-    if (match.rerack) {
-      balls = createRack();
-      potted = 0;
-      scratchPending = false;
-      placementPrompted = false;
-    } else if (match.last.kind === 'foul') {
-      // The referee awards ball-in-hand even when the white was not potted.
-      // Reuse the existing collision-safe placement flow.
-      balls[0].pocketed = true;
-      balls[0].vx = 0; balls[0].vz = 0;
-      balls[0].spinVx = 0; balls[0].spinVz = 0;
-      scratchPending = true;
-      placementPrompted = false;
-    } else {
-      scratchPending = false;
+  if (!nowMoving && wasMoving && mode === 'solo' && soloShotStarted) {
+    const actualPots = soloShotEvents
+      .filter((event) => event.type === 'potted').map((event) => event.id);
+    const scratch = soloShotEvents.some((event) => event.type === 'scratch');
+    solo = settleSoloShot(solo, {
+      pottedIds: actualPots, scratch, remaining: remainingObjectBalls(balls),
+    });
+    soloShotStarted = false;
+    soloShotEvents = [];
+    if (solo.completed) {
+      if (solo.record) saveSoloBest(solo.best);
+      say(solo.record
+        ? 'Matthias: ¡Mesa limpia en ' + solo.shots + ' tiros! Nuevo récord. Admitiré que es respetable.'
+        : 'Matthias: Mesa limpia en ' + solo.shots + ' tiros. La próxima vez, supera tu marca.');
+    } else if (solo.last.kind === 'scratch') {
+      say('Matthias: Blanca embocada. Falta registrada. Tu racha, al cementerio.');
+    } else if (solo.last.kind === 'multi') {
+      say('Matthias: ' + solo.last.balls + ' bolas en un tiro. Una rareza estadísticamente agradable.');
+    } else if (solo.last.kind === 'pot' && solo.streak >= 2) {
+      say('Matthias: ' + solo.streak + ' tiros embocando seguidos. Empiezo a preocuparme.');
+    } else if (solo.last.kind === 'miss') {
+      say('Matthias: Un tiro y ninguna bola. El billar sigue invicto.');
     }
-    say('Matthias: ' + match.last.reason + '.');
-    syncMatchUI();
+    syncSoloUI();
     dirtyHUD = true;
   }
   if (!nowMoving) {
     // Pool object balls stay pocketed; no snooker colour respotting.
     if (scratchPending && !placementPrompted) {
       placementPrompted = true;
-      say('Matthias: ' + (mode === 'versus'
-        ? 'Falta: jugador ' + (match.player + 1) + ', blanca en mano.'
-        : 'Blanca en mano. Elige un hueco libre en la mesa, o pulsa COLOCAR.'));
+      say('Matthias: Blanca en mano. Elige un hueco libre en la mesa, o pulsa COLOCAR.');
     }
     if (wasMoving && mode === 'practice' && !scratchPending && remainingObjectBalls(balls) === 0) {
       say('Matthias: Todas dentro. Me veo obligado, muy a mi pesar, a felicitarte.');
@@ -889,7 +866,7 @@ function frame(now) {
   }
   wasMoving = nowMoving;
   modePractice.disabled = nowMoving || charge.active;
-  modeVersus.disabled = nowMoving || charge.active;
+  modeSolo.disabled = nowMoving || charge.active;
   if (availableUpdate && !wasMoving) updateBanner.hidden = false;
   if (dirtyHUD) { formatScore(); dirtyHUD = false; }
   if (scratchPending !== wasPlacementMode) {
@@ -905,8 +882,7 @@ function frame(now) {
   }
   viewport.dataset.cuePlacement = scratchPending ? 'required' : '';
   strikeButton.disabled = wasMoving || (balls[0].pocketed && !scratchPending) ||
-    (mode === 'versus' && match.winner !== null) ||
-    (needsPocketCall() && announcedPocket === null && !scratchPending);
+    (mode === 'solo' && solo.completed);
   spinButton.disabled = wasMoving || balls[0].pocketed;
   fineLeft.disabled = spinButton.disabled;
   fineRight.disabled = spinButton.disabled;
@@ -920,5 +896,5 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-syncMatchUI();
+syncSoloUI();
 versionWatcher.start();

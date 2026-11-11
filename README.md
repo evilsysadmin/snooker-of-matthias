@@ -1,6 +1,6 @@
 # 🎱 Billiards of Matthias
 
-A playable **American pool 8-ball** game in real 3D with free practice and a local two-player house-rules match, part of ShadowOps. The current repository, npm package and staging technical IDs retain their original `snooker` names for backward compatibility with the protected Identity/Cloudflare deployment. Product branding is **Billiards of Matthias**.
+A playable **single-player American pool 8-ball** game in real 3D, with free practice and a solo 15-ball clearance challenge, part of ShadowOps. The current repository, npm package and staging technical IDs retain their original `snooker` names for backward compatibility with the protected Identity/Cloudflare deployment. Product branding is **Billiards of Matthias**.
 
 ## Pool practice (current)
 
@@ -12,18 +12,17 @@ A playable **American pool 8-ball** game in real 3D with free practice and a loc
 - Scratched white is ball-in-hand anywhere legally clear on the cloth after balls stop; touch a vacant position or press **COLOCAR** to choose a safe default.
 - Shot/pot counters and Matthias's occasional sarcastic remarks.
 
-## Two-player local 8-ball (friendly house rules)
+## Single-player challenge: Desafío 15
 
-Select **2 jugadores** in the top bar to start a new pass-and-play match on the same real 3D table. **Práctica** remains the default; switching modes or restarting resets the rack.
+**Libre** is the default; switch to **Desafío 15** to try to clear the entire 15-ball rack in as few physical cue strokes as possible. Changing modes or restarting deliberately resets the current rack.
 
-- The opening break must pocket an object or send four *different object balls* to a cushion; otherwise the rival receives ball-in-hand. A black on the break triggers an immediate rerack instead of awarding victory.
-- The table stays open after the break. The first legal later shot potting only lisas **or** rayadas assigns that group and the other group to the rival. If both groups pot on the same stroke, the table stays open and the turn passes.
-- After the first white/object contact, something must hit a rail or an object must drop. The first contact must be with your group, or with the black 8 after all of your group has been cleared **before the stroke**.
-- Legal own-group pots let you continue; misses or opponent-group pots pass the turn. Fouls (scratch, wrong first hit, missing required rail/pocket, illegal break) give the next player the white **in hand anywhere safe on the cloth**.
-- When only your black 8 remains, **announce its pocket** with the on-screen selector. Potting it cleanly into the selected pocket wins; an early eight, wrong pocket or scratch on the eight loses.
-- Matthias announces decisions using measured shot events: cue/object impact, cushion and actual pocket index, never invented shots.
+- Every genuinely completed shot counts as one stroke. Only actual pocket collision events reduce the remaining balls; shots with no pots are misses.
+- White scratches are tracked as faults (you can reposition the white safely with normal ball-in-hand), and a fault or miss breaks the streak of consecutive successful strokes.
+- Potting multiple balls in the same shot counts all of them. The challenge celebrates combos and real potting streaks; the jokes from Matthias depend on the actual shot outcome, not estimated performance.
+- Only clearing **all 15 object balls** establishes a finish. Your best is the **fewest actual strokes**, with fewer scratches as the tiebreaker. No fake completed scores, no time-based grind.
+- Your personal best persists **in the current browser only** via a small versioned localStorage entry. It never stores authentication credentials or uploads play statistics. If browser storage is blocked, play keeps working and the best is maintained only within the current page session.
 
-These are intentionally **simplified local house rules, not official WPA competition 8-ball**. There is no online multiplayer, shot-call requirement for ordinary solids/stripes, tournament administration or automatic dispute resolution. The first release is aimed at a fun, repeatable two-player local game rather than a rules-certified competitive simulator.
+The two-player 8-ball referee remains headless and unit-tested in `src/eightBallRules.js`, but **two-player play has deliberately been removed from the visible UI** until it is a priority again. The solo challenge uses its own independent counter; it does not apply two-player fouls/turns to free practice.
 
 ## Development
 
@@ -48,7 +47,8 @@ Technical staging URL: **https://staging.snooker.shadowops.dpdns.org/**. Do not 
 
 - `src/physics.js`: deterministic, headless ball/rail/pocket physics, centred white and pool triangle.
 - `src/practiceRules.js`: free-practice remaining-ball/clearance counters.
-- `src/eightBallRules.js`: pure, headless two-player house-rule referee with deterministic foul/win decisions.
+- `src/soloChallenge.js`: immutable solo 15-ball scoring and versioned local record.
+- `src/eightBallRules.js`: retained pure two-player referee, intentionally not exposed in the current interface.
 - `src/main.js`: real Three.js scene, cue, stripes/numbers, input and HUD.
 - `src/styles.css`: desktop/mobile presentation.
 - `e2e/smoke.mjs`: real desktop/mobile WebGL interaction checks.

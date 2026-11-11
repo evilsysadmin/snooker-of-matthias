@@ -186,7 +186,7 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   .hint { display: none; }
 }
 
-/* Two-player match affordances: a compact header switch, not a second HUD. */
+/* Single-player free practice / solo rack challenge. Keep the table dominant. */
 .mode-switch {
   position: absolute;
   top: 9px;
@@ -211,17 +211,17 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
 }
 .mode-switch button[aria-pressed="true"] { color: #14241d; background: #e1c388; }
 .mode-switch button:disabled { opacity: .5; cursor: not-allowed; }
-.mode-switch button:focus-visible, .pocket-call select:focus-visible {
+.mode-switch button:focus-visible {
   outline: 2px solid #e1c388;
   outline-offset: 2px;
 }
-.match-status {
+.solo-status {
   position: absolute;
   z-index: 3;
   left: 50%;
   top: 89px;
   transform: translateX(-50%);
-  max-width: calc(100vw - 24px);
+  max-width: min(650px, calc(100vw - 24px));
   padding: 7px 12px;
   background: #0a201de9;
   border: 1px solid #9bb7a94d;
@@ -229,40 +229,12 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   color: #f1deae;
   font-size: 11px;
   font-weight: 800;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.35;
   letter-spacing: .03em;
 }
-.table-label[hidden], .match-status[hidden], .pocket-call[hidden] { display: none; }
-.pocket-call {
-  position: absolute;
-  z-index: 4;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  max-width: calc(100% - 18px);
-  padding: 7px 10px;
-  color: #ffe5a5;
-  background: #102521f8;
-  border: 1px solid #d7b9758a;
-  border-radius: 10px;
-  box-shadow: 0 12px 35px #0009;
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-.pocket-call select {
-  min-height: 35px;
-  max-width: min(280px, 45vw);
-  padding: 0 8px;
-  border: 1px solid #b9c9bd66;
-  border-radius: 7px;
-  background: #244038;
-  color: #f4ecda;
-  font-size: 11px;
-}
+.table-label[hidden], .solo-status[hidden] { display: none; }
 @media (max-width: 700px) {
   .mode-switch {
     top: 47px;
@@ -272,7 +244,7 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
     padding: 2px;
   }
   .mode-switch button { min-height: 33px; padding: 0 7px; font-size: 10px; }
-  .match-status {
+  .solo-status {
     top: 113px;
     right: 10px;
     left: auto;
@@ -280,10 +252,15 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
     font-size: 10px;
     padding: 5px 8px;
   }
-  .pocket-call { gap: 5px; padding: 6px 8px; font-size: 10px; }
-  .pocket-call select { max-width: min(210px, 51vw); font-size: 10px; }
 }
 @media (max-height: 580px) and (max-width: 700px) {
   .mode-switch { top: 45px; }
-  .match-status { top: 101px; }
+  .solo-status { top: 101px; }
+}
+
+/* Version prompt is rare; avoid hiding solo progress when it appears. */
+#viewport[data-game-mode="solo"] ~ .update-banner { top: 150px; }
+@media (max-width: 700px) {
+  .solo-status { max-width: min(300px, calc(100vw - 24px)); }
+  #viewport[data-game-mode="solo"] ~ .update-banner { top: 171px; }
 }
