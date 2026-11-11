@@ -849,8 +849,18 @@ const projectedCorner = new THREE.Vector3();
 function resize() {
   const rect = viewport.getBoundingClientRect();
   const width = Math.max(1, rect.width), height = Math.max(1, rect.height);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.setSize(width, height, false);
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  // Resizing the WebGL drawing buffer clears its pixels. On mobile, changing
+  // Matthias's commentary changes the panel height (and the viewport), so a
+  // screenshot or a real display refresh could observe only the dark page
+  // background before the next costly software/phone GPU frame.
+  const sizeChanged = renderer.getPixelRatio() !== pixelRatio ||
+    renderer.domElement.width !== Math.floor(width * pixelRatio) ||
+    renderer.domElement.height !== Math.floor(height * pixelRatio);
+  if (sizeChanged) {
+    if (renderer.getPixelRatio() !== pixelRatio) renderer.setPixelRatio(pixelRatio);
+    renderer.setSize(width, height, false);
+  }
   const aspect = width / height;
   const portrait = width <= 700 && height > width * 1.15;
 
@@ -893,6 +903,10 @@ function resize() {
     else near = mid;
   }
   fits(far);
+  // Paint immediately with the freshly fitted camera when the drawing buffer
+  // actually changes size. Physics remains exclusively in the fixed-step RAF.
+  // No work is done for repeated ResizeObserver notifications of equal size.
+  if (sizeChanged) renderer.render(scene, camera);
 }
 function setCameraMode(mode) {
   camera = mode === '3d' ? perspectiveCamera : topCamera;

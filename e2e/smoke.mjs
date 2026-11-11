@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { chromium } from '@playwright/test';
+import { screenshotShowsFelt } from './pngFeltProbe.mjs';
 
 mkdirSync('artifacts', { recursive: true });
 const browser = await chromium.launch({
@@ -178,10 +179,13 @@ try {
       await page.locator('#fine-right').tap();
       assert.equal(await page.locator('#fine-angle').innerText(), '+0,5°');
     }
-    await page.screenshot({
+    const topPng = await page.screenshot({
       path: 'artifacts/snooker-' + config.name + '-top.png', fullPage: true,
       animations: 'disabled',
     });
+    const tableRect = await page.locator('#viewport').boundingBox();
+    assert.ok(screenshotShowsFelt(topPng, tableRect),
+      config.name + ' top camera must paint real green felt, not an empty WebGL canvas');
     await page.locator('#camera-3d').click();
     assert.equal(await page.locator('#viewport').getAttribute('data-camera'), '3d');
     assert.equal(await page.locator('#camera-3d').getAttribute('aria-pressed'), 'true');
@@ -334,10 +338,18 @@ try {
       assert.ok(pair.sound.width >= 33 && pair.sound.height >= 33,
         'mute control is reachable on mobile');
     }
-    await page.screenshot({
+    const soloPng = await page.screenshot({
       path: 'artifacts/billiards-' + config.name + '-solo.png',
       fullPage: true, animations: 'disabled',
     });
+    // A previous mobile smoke passed despite an entirely black WebGL table
+    // after the solo stroke. Check actual screenshot pixels, not just DOM/game.
+    const glState = await page.locator('#viewport canvas').evaluate((canvas) => {
+      const gl = canvas.getContext('webgl2');
+      return { lost: gl?.isContextLost() ?? null, width: canvas.width, height: canvas.height };
+    });
+    assert.ok(screenshotShowsFelt(soloPng, await page.locator('#viewport').boundingBox()),
+      config.name + ' solo stroke must retain visible green felt: ' + JSON.stringify(glState));
 
     // The record survives an explicit new rack. Storage is not used as a
     // game-state oracle; the pure referee tests cover genuinely earned bests.

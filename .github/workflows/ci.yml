@@ -27,8 +27,11 @@ jobs:
         run: npm test
       - name: Production 3D build
         run: npm run build
+      # ubuntu-24.04 hosted runners already provide Chromium's shared libs.
+      # Avoid apt --with-deps, which depends on an extra Ubuntu mirror DNS
+      # (and blocked otherwise green CI on 2026-11-11).
       - name: Install Chromium for a real WebGL smoke
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       - name: Exercise desktop and mobile 3D browser
         shell: bash
         run: |
