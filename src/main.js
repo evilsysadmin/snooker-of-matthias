@@ -471,6 +471,9 @@ soundToggle.addEventListener('click', () => {
 });
 syncSoundButton();
 const versionWatcher = createVersionWatcher({
+  // Vite injects this exact source SHA into the immutable CI build. The
+  // authenticated release.json then compares *deployed* vs *running* code.
+  sourceSha: import.meta.env.VITE_SOURCE_SHA || null,
   isVisible: () => !document.hidden,
   onAvailable: () => {
     availableUpdate = true;

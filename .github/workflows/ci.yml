@@ -26,7 +26,24 @@ jobs:
       - name: Deterministic physics tests
         run: npm test
       - name: Production 3D build
+        env:
+          # On main push this is the same SHA admitted by ShadowOps Infra.
+          # A PR artifact is never admitted for staging publication.
+          VITE_SOURCE_SHA: ${{ github.sha }}
         run: npm run build
+      - name: Verify build identifies its exact source commit
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          node --input-type=module -e '
+            import fs from "node:fs";
+            import assert from "node:assert/strict";
+            const sha = process.env.SOURCE_SHA;
+            assert.match(sha, /^[a-f0-9]{40}$/);
+            const files = fs.readdirSync("dist/assets").filter(x => x.endsWith(".js"));
+            assert.ok(files.some(name => fs.readFileSync("dist/assets/" + name, "utf8").includes(sha)),
+              "Published JS bundle does not identify the exact source commit");
+          '
       # ubuntu-24.04 hosted runners already provide Chromium's shared libs.
       # Avoid apt --with-deps, which depends on an extra Ubuntu mirror DNS
       # (and blocked otherwise green CI on 2026-11-11).

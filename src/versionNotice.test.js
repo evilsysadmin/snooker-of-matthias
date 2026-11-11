@@ -179,3 +179,71 @@ test('non-auth failures never trigger the refresh flow', async () => {
   assert.equal(result, null);
   assert.equal(requests, 1, 'temporary Identity or Pages outage stays fail closed');
 });
+
+test('a stale deployed bundle immediately detects a newer release on its first valid poll', async () => {
+  let sha = B;
+  const notified = [];
+  let timer;
+  const watcher = createVersionWatcher({
+    sourceSha: A,
+    readRelease: async () => sha,
+    onAvailable: () => notified.push(sha),
+    repeat: (fn) => { timer = fn; return 5; },
+    cancel: () => {},
+  });
+  watcher.start();
+  // Wait for an in-flight first request or explicitly make a follow-up check.
+  await watcher.check();
+  assert.deepEqual(notified, [B],
+    'a tab running old JS must notify even when the first release read is newer');
+  await timer();
+  assert.deepEqual(notified, [B], 'same release must not nag on every poll');
+  sha = C;
+  await timer();
+  assert.deepEqual(notified, [B, C], 'later release still prompts');
+  watcher.stop();
+});
+
+test('a deployed build SHA never triggers a false update on same release', async () => {
+  const notified = [];
+  let timer;
+  const watcher = createVersionWatcher({
+    sourceSha: A,
+    readRelease: async () => A,
+    onAvailable: () => notified.push('wrong'),
+    repeat: (fn) => { timer = fn; return 9; },
+    cancel: () => {},
+  });
+  watcher.start();
+  await watcher.check();
+  await timer();
+  assert.deepEqual(notified, []);
+  watcher.stop();
+});
+
+test('untrusted or malformed build SHAs are rejected without user prompts', () => {
+  for (const sourceSha of ['', 'main', 'A'.repeat(40), 'f'.repeat(39), 3]) {
+    assert.throws(() => createVersionWatcher({
+      sourceSha, onAvailable: () => {}, readRelease: async () => A,
+    }), TypeError);
+  }
+});
+
+test('a signed-in client can recover from a denied first release read with its build baseline', async () => {
+  let sha = null;
+  const notified = [];
+  const watcher = createVersionWatcher({
+    sourceSha: A,
+    readRelease: async () => sha,
+    onAvailable: () => notified.push(sha),
+    repeat: () => 9,
+    cancel: () => {},
+  });
+  watcher.start();
+  await watcher.check();
+  assert.deepEqual(notified, [], 'identity denial is not a release event');
+  sha = B;
+  await watcher.check();
+  assert.deepEqual(notified, [B], 'first authenticated release check can still notify');
+  watcher.stop();
+});
