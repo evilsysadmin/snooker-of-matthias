@@ -83,6 +83,8 @@ try {
       'on', 'sound may be re-enabled after a real gesture');
     const spinControl = page.locator('#spin-cycle');
     assert.equal(await spinControl.getAttribute('data-spin'), '0', 'default shot uses centre hit');
+    assert.equal(await spinControl.locator('.spin-disc .spin-dot').count(), 1,
+      'spin power is represented by a physical cue-ball with marked contact');
     const selectSpin = async () => {
       if (config.isMobile) await spinControl.tap();
       else await spinControl.click();
@@ -96,6 +98,17 @@ try {
     await selectSpin();
     assert.equal(await spinControl.getAttribute('data-spin'), '1');
     assert.equal(await page.locator('#shots').innerText(), '00', 'spin choice never fires a shot');
+    if (!config.isMobile) {
+      assert.equal(await page.locator('.fine-aim').isVisible(), true,
+        'canonical wide desktop HUD shows precise aiming controls');
+      // Unfocused arrow keys use the same deterministic 0.5-degree nudges.
+      await page.evaluate(() => document.activeElement?.blur());
+      await page.keyboard.press('ArrowLeft');
+      assert.equal(await page.locator('#fine-angle').innerText(), '−0,5°');
+      await page.keyboard.press('ArrowRight');
+      assert.equal(await page.locator('#fine-angle').innerText(), '0,0°');
+      assert.equal(await page.locator('#shots').innerText(), '00');
+    }
     // Point at the apex of the pool triangle from the centred cue position. Project known
     // world coordinates through the same orthographic framing in both sizes.
     const rackScreen = await page.locator('#viewport canvas').evaluate((canvas) => {
@@ -252,6 +265,19 @@ try {
     assert.match(await page.locator('#update-banner').innerText(), /reinicia la mesa actual/);
     assert.equal(await page.locator('#shots').innerText(), '00',
       'new-release banner does not discard the game');
+    const updateRects = await page.evaluate(() => {
+      const rect = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON();
+      return {
+        update: rect('#update-banner'), camera: rect('.camera-switch'),
+        modes: rect('.mode-switch'), controls: rect('.bottom-panel'),
+      };
+    });
+    assert.ok(!overlaps(updateRects.update, updateRects.camera),
+      'new release notification never hides camera controls');
+    assert.ok(!overlaps(updateRects.update, updateRects.modes),
+      'new release notification never hides solo mode buttons');
+    assert.ok(!overlaps(updateRects.update, updateRects.controls),
+      'new release notification never hides the shot/restart controls');
     await page.locator('#update-later').click();
     assert.equal(await page.locator('#update-banner').isHidden(), true);
     // Only solo modes are visible: the 2-player referee is retained in code
@@ -263,6 +289,14 @@ try {
     assert.equal(await page.locator('#mode-solo').getAttribute('aria-pressed'), 'true');
     assert.equal(await soloStatus.isVisible(), true);
     assert.match(await soloStatus.innerText(), /Desafío 15.*15 restantes.*Sin récord/);
+    if (config.isMobile) {
+      const positions = await page.evaluate(() => ({
+        status: document.querySelector('#solo-status').getBoundingClientRect().toJSON(),
+        canvas: document.querySelector('#viewport').getBoundingClientRect().toJSON(),
+      }));
+      assert.ok(positions.status.bottom <= positions.canvas.top + 48,
+        'challenge badge stays above the first portrait tabletop rail');
+    }
     assert.equal(await page.locator('#viewport').getAttribute('data-game-mode'), 'solo');
     assert.equal(await page.locator('#shots').innerText(), '00', 'switching modes reracks cleanly');
 
