@@ -26,6 +26,25 @@ A playable **single-player American pool 8-ball** game in real 3D, with free pra
 
 The two-player 8-ball referee remains headless and unit-tested in `src/eightBallRules.js`, but **two-player play has deliberately been removed from the visible UI** until it is a priority again. The solo challenge uses its own independent counter; it does not apply two-player fouls/turns to free practice.
 
+## Canonical visual reference (desktop + mobile, 11 November 2026)
+
+The user-approved Billiards of Matthias desktop and mobile mockups are the
+visual target for gameplay and UI work, **not replacement flat background images**.
+Preserve their premium dark-teal/gold/forest-felt/walnut identity and clear,
+large real 3D playable table. In particular, make every numbered pool ball
+legible and dimensional, keep accurate cue aim/ghost-ball prediction, maintain
+unobstructed camera and shot controls, and protect touch/keyboard gameplay.
+
+The first material pass uses local, deterministic procedural texture generation:
+fine cloth nap, walnut grain, quieter brass and ivory rail diamonds, and
+sphere-mapped 1–15 solids/stripes with readable numbers. The physics table and
+ball radii are **unchanged**, and no external art/asset requests are required.
+
+The authenticated in-game **Nueva versión disponible** notice and its
+ShadowOps ID renewal behavior are non-regression requirements for every visual
+iteration: no auto-refresh during play, no guest manifest exposure, and no
+overlap with the mobile HUD.
+
 ## Development
 
 Requires Node.js 22+.
