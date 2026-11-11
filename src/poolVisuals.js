@@ -44,9 +44,9 @@ export function createFeltTexture(THREE, documentRef = document) {
       const grain = (seed >>> 24) % 13 - 6;
       const nap = (x + y) % 3;
       const i = (y * 256 + x) * 4;
-      image.data[i] = 15 + grain;
-      image.data[i + 1] = 103 + grain + nap;
-      image.data[i + 2] = 70 + grain;
+      image.data[i] = 12 + grain;
+      image.data[i + 1] = 77 + grain + nap;
+      image.data[i + 2] = 53 + grain;
       image.data[i + 3] = 255;
     }
   }
@@ -61,7 +61,7 @@ export function createFeltTexture(THREE, documentRef = document) {
 // Subtle longitudinal grain reads as walnut rather than painted plastic.
 export function createWalnutTexture(THREE, documentRef = document) {
   const [surface, ctx] = canvas(512, documentRef);
-  ctx.fillStyle = '#62412e';
+  ctx.fillStyle = '#47281d';
   ctx.fillRect(0, 0, 512, 512);
   let seed = 0x581d326;
   for (let i = 0; i < 760; i++) {
