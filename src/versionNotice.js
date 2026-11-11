@@ -60,6 +60,9 @@ export async function readDeployedRelease(fetcher = fetch) {
 
 export function createVersionWatcher({
   readRelease = readDeployedRelease,
+  // The build SHA is the only trustworthy baseline for already-open clients.
+  // Local dev can omit it and retain the first-valid-read fallback.
+  sourceSha = null,
   onAvailable,
   isVisible = () => true,
   everyMs = 90_000,
@@ -67,10 +70,11 @@ export function createVersionWatcher({
   cancel = clearInterval,
 }) {
   if (typeof readRelease !== 'function' || typeof onAvailable !== 'function' ||
-      typeof isVisible !== 'function' || everyMs < 30_000) {
+      typeof isVisible !== 'function' || everyMs < 30_000 ||
+      (sourceSha !== null && (typeof sourceSha !== 'string' || !SHA.test(sourceSha)))) {
     throw new TypeError('Invalid version watcher configuration');
   }
-  let initial = null;
+  let initial = sourceSha;
   let notified = null;
   let inflight = false;
   let active = false;
@@ -83,6 +87,7 @@ export function createVersionWatcher({
       const sha = await readRelease();
       if (typeof sha !== 'string' || !SHA.test(sha)) return;
       if (initial === null) {
+        // Only for local/unversioned builds; production supplies sourceSha.
         initial = sha;
       } else if (sha !== initial && sha !== notified) {
         notified = sha;
