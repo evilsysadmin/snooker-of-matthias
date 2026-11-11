@@ -18,6 +18,16 @@ try {
       isMobile: config.isMobile, hasTouch: config.hasTouch,
     });
     const page = await context.newPage();
+    let publishedSha = 'a'.repeat(40);
+    // Exercise the protected release.json contract without a live login.
+    await page.route('**/release.json', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({
+        schema: 1, application: 'snooker-of-matthias',
+        environment: 'staging', source_sha: publishedSha,
+        authentication: { provider: 'shadowops-id', audience: 'snooker', required: true },
+      }),
+    }));
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto('http://127.0.0.1:4173/', { waitUntil: 'load' });
@@ -42,6 +52,11 @@ try {
       };
     });
     assert.ok(layout.viewport.top >= layout.header.bottom - 1, 'table viewport clears header');
+    if (!config.isMobile) {
+      assert.ok(layout.viewport.height >= 600,
+        'desktop gets a larger table viewport instead of empty vertical bands');
+      assert.ok(layout.controls.width >= 900, 'controls use available desktop width');
+    }
     assert.ok(layout.viewport.bottom <= layout.controls.top + 1, 'table viewport clears controls');
     const overlaps = (a, b) =>
       a.left < b.right - 1 && a.right > b.left + 1 &&
@@ -215,6 +230,18 @@ try {
     assert.match(await page.locator('#potted').innerText(), /00.*15 en mesa/s);
     assert.match(await page.locator('.brand').innerText(), /BILLIARDS OF MATTHIAS/);
     assert.match(await page.locator('.table-label').innerText(), /POOL 8-BALL/);
+    assert.equal(await page.locator('#update-banner').isHidden(), true,
+      'no spurious banner for the current build');
+    // A changed deployed source SHA is signalled without automatically reloading.
+    publishedSha = 'b'.repeat(40);
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.locator('#update-banner').waitFor({ state: 'visible' });
+    assert.match(await page.locator('#update-banner').innerText(), /Nueva versión disponible/);
+    assert.match(await page.locator('#update-banner').innerText(), /reinicia la mesa actual/);
+    assert.equal(await page.locator('#shots').innerText(), '00',
+      'new-release banner does not discard the game');
+    await page.locator('#update-later').click();
+    assert.equal(await page.locator('#update-banner').isHidden(), true);
     assert.deepEqual(errors, [], config.name + ' browser runtime errors');
     console.log('SNOOKER_BROWSER_' + config.name.toUpperCase() + '_PASS', dimensions);
     await context.close();
