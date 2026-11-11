@@ -834,34 +834,34 @@ function updateCue(now) {
   }
   viewport.dataset.aimTarget = '';
   viewport.dataset.aimJaw = '';
-  // Animate a short, bounded cue-tip strike before hiding the stick during roll.
-  // Only the illustration animates: actual physics starts immediately on release.
+  // Shot physics already starts in shoot(); the stick is pure presentation.
+  // Three distinct beats: quick contact, restrained recoil, quiet recovery.
+  viewport.dataset.cueCharge = charge.active ? 'active' : '';
   if (strokeAnimation) {
-    const elapsed = now - strokeAnimation.at;
-    if (elapsed < 140) {
-      const { x, z, dx, dz, power } = strokeAnimation;
-      const travel = 0.028 + power * 0.15;
-      const progress = elapsed < 65 ? (elapsed / 65) ** 2 :
-        Math.max(0, 1 - (elapsed - 65) / 75);
-      const offset = 1.34 + TABLE.ballRadius + 0.04 + power * 0.15 - travel * progress;
-      cueStick.position.set(x - dx * offset, TABLE.ballRadius + 0.052, z - dz * offset);
+    const { x, z, dx, dz, power } = strokeAnimation;
+    const pose = cueStrokePose(now - strokeAnimation.at, power, reducedCueMotion.matches);
+    if (pose) {
+      const offset = CUE_TIP_LOCAL_X + TABLE.ballRadius + pose.gap;
+      cueStick.position.set(x - dx * offset, TABLE.ballRadius + 0.052 + pose.lift, z - dz * offset);
       cueStick.rotation.y = -Math.atan2(dz, dx);
       cueStick.visible = true;
       guide.visible = false;
       viewport.dataset.stroke = 'active';
+      viewport.dataset.strokePhase = pose.phase;
       syncTargetLens(null);
       return;
     }
     strokeAnimation = null;
   }
   viewport.dataset.stroke = '';
+  viewport.dataset.strokePhase = '';
   const available = !cue.pocketed && !ballsMoving(balls);
   cueStick.visible = available;
   guide.visible = available;
   if (!available) { syncTargetLens(null); return; }
-  // Put the actual tip just behind the white, with a small power-dependent draw-back.
-  // 1.34 is the tip's local x coordinate inside the cue-stick model.
-  const offset = 1.34 + TABLE.ballRadius + 0.04 + (Number(powerInput.value) / 100) * 0.15;
+  // Charging visibly draws the cue back; it never moves the cue-ball.
+  const offset = CUE_TIP_LOCAL_X + TABLE.ballRadius +
+    cueIdleGap(Number(powerInput.value) / 100, charge.active);
   cueStick.position.set(cue.x - aim.x * offset, TABLE.ballRadius + 0.052, cue.z - aim.z * offset);
   cueDirection.copy(aim);
   cueStick.rotation.y = -Math.atan2(aim.z, aim.x);
