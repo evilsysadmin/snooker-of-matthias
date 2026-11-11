@@ -130,6 +130,26 @@ test('every pocket has two mirrored rounded jaws inside the playable table', () 
   }
 });
 
+test('a clean diagonal shot can enter each of the four corner mouths', () => {
+  // Previously every such trajectory struck a jaw before pocket capture.
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const dx = 4.33 - 3.75, dz = 2.15 - 1.55;
+    const length = Math.hypot(dx, dz);
+    const ball = {
+      id: 1, x: sx * 3.75, z: sz * 1.55,
+      vx: sx * 3 * dx / length, vz: sz * 3 * dz / length,
+      pocketed: false,
+    };
+    const events = [];
+    for (let i = 0; i < 120 && !ball.pocketed; i++) {
+      events.push(...stepPhysics([ball], 1 / 120));
+    }
+    assert.equal(ball.pocketed, true, `clean corner ${sx}, ${sz} must be reachable`);
+    const pocket = sx < 0 ? (sz < 0 ? 0 : 3) : (sz < 0 ? 2 : 5);
+    assert.deepEqual(events, [{ type: 'potted', id: 1, pocket }]);
+  }
+});
+
 test('a grazing shot at each middle-pocket shoulder is really rejected', () => {
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     const jaw = POCKET_JAWS.find((item) =>
