@@ -69,6 +69,18 @@ try {
         'mobile camera selector stays above the upper tabletop cushion');
     }
     assert.ok(layout.pageWidth <= layout.windowWidth + 1, 'no horizontal scrolling');
+    const soundControl = page.locator('#sound-toggle');
+    assert.equal(await soundControl.getAttribute('aria-pressed'), 'true',
+      'sound effects are enabled but must not autoplay');
+    await soundControl.click();
+    assert.equal(await soundControl.getAttribute('aria-pressed'), 'false');
+    assert.equal(await soundControl.getAttribute('aria-label'), 'Activar efectos de sonido');
+    assert.equal(await page.evaluate(() => localStorage.getItem('shadowops.billiards.effects.v1')),
+      'off', 'muting saves a bounded browser-only preference');
+    await soundControl.click();
+    assert.equal(await soundControl.getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.evaluate(() => localStorage.getItem('shadowops.billiards.effects.v1')),
+      'on', 'sound may be re-enabled after a real gesture');
     const spinControl = page.locator('#spin-cycle');
     assert.equal(await spinControl.getAttribute('data-spin'), '0', 'default shot uses centre hit');
     const selectSpin = async () => {
@@ -276,9 +288,12 @@ try {
       const pair = await page.evaluate(() => ({
         camera: document.querySelector('.camera-switch').getBoundingClientRect().toJSON(),
         modes: document.querySelector('.mode-switch').getBoundingClientRect().toJSON(),
+        sound: document.querySelector('#sound-toggle').getBoundingClientRect().toJSON(),
       }));
       assert.ok(!overlaps(pair.camera, pair.modes),
-        'mobile solo mode controls do not cover camera controls');
+        'mobile solo and sound controls do not cover camera controls');
+      assert.ok(pair.sound.width >= 33 && pair.sound.height >= 33,
+        'mute control is reachable on mobile');
     }
     await page.screenshot({
       path: 'artifacts/billiards-' + config.name + '-solo.png',
