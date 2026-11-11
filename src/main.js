@@ -215,19 +215,64 @@ for (const x of [-3.72, 3.72]) for (const z of [-1.64, 1.64]) {
 }
 
 const ballGeo = new THREE.SphereGeometry(TABLE.ballRadius, 32, 24);
-// White, 15 reds, then yellow, green, brown, blue, pink and black.
-const colors = [
-  0xfaf9ed, ...Array(15).fill(0xb11e2e),
-  0xf1d02d, 0x237342, 0x86502d, 0x244cb2, 0xf0a0b2, 0x15191b,
+// American pool: numbered solids 1–7, black 8, striped 9–15.
+const poolColors = [
+  0xfaf9ed, 0xf2c538, 0x255fbd, 0xb72731, 0x66419b,
+  0xe48a29, 0x258d5a, 0x753524, 0x121819,
+  0xf2c538, 0x255fbd, 0xb72731, 0x66419b,
+  0xe48a29, 0x258d5a, 0x753524,
 ];
+function numberDecal(number) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 128, 128);
+  ctx.fillStyle = '#fffaf0';
+  ctx.beginPath();
+  ctx.arc(64, 64, 60, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#182023';
+  ctx.font = 'bold 76px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(number), 64, 68);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
 function ballModel(number) {
   const group = new THREE.Group();
+  const striped = number >= 9;
+  const ballColor = poolColors[number];
   const base = new THREE.Mesh(ballGeo, new THREE.MeshPhysicalMaterial({
-    color: colors[number], roughness: 0.15, clearcoat: 0.85, clearcoatRoughness: 0.12,
+    color: striped ? 0xfaf9ed : ballColor,
+    roughness: 0.15, clearcoat: 0.85, clearcoatRoughness: 0.12,
   }));
   base.castShadow = true;
   base.receiveShadow = true;
   group.add(base);
+  if (striped) {
+    group.add(new THREE.Mesh(
+      new THREE.SphereGeometry(TABLE.ballRadius * 1.006, 32, 20,
+        0, Math.PI * 2, Math.PI * 0.33, Math.PI * 0.34),
+      new THREE.MeshPhysicalMaterial({
+        color: ballColor, roughness: 0.15, clearcoat: 0.85,
+      }),
+    ));
+  }
+  if (number > 0) {
+    const decal = new THREE.Mesh(
+      new THREE.CircleGeometry(TABLE.ballRadius * 0.47, 24),
+      new THREE.MeshBasicMaterial({
+        map: numberDecal(number), transparent: true, depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    decal.rotation.x = -Math.PI / 2;
+    decal.position.y = TABLE.ballRadius * 1.006;
+    group.add(decal);
+  }
   scene.add(group);
   return group;
 }
