@@ -53,11 +53,15 @@ app.innerHTML = [
     '<div class="shot-controls">',
       '<div class="power"><div class="power-heading"><span>POTENCIA</span><output id="power-value" for="power">55%</output></div>',
       '<input id="power" type="range" min="0" max="100" value="55" aria-label="Potencia del golpe" /></div>',
-      '<button id="spin-cycle" class="spin-cycle" type="button" data-spin="0" aria-label="Efecto de la blanca: centro. Pulsa para cambiar" title="Efecto de la blanca: centro · pulsa para cambiar">● Centro</button>',
+      '<button id="spin-cycle" class="spin-cycle" type="button" data-spin="0" aria-label="Efecto de la blanca: centro. Pulsa para cambiar" title="Efecto de la blanca: centro · pulsa para cambiar">',
+        '<span class="spin-title" aria-hidden="true">GIRO (EFECTO)</span>',
+        '<span class="spin-disc" aria-hidden="true"><span class="spin-dot"></span></span>',
+        '<span class="spin-name" aria-hidden="true">Centro</span>',
+      '</button>',
       '<button id="strike" class="strike" type="button" aria-label="Golpear: toca para usar la potencia elegida, mantén pulsado para cargar" title="Toca para golpear · mantén pulsado para cargar"><span>⚡</span> GOLPEAR <kbd>ESPACIO</kbd></button>',
       '<button id="restart" class="restart" type="button" title="Recolocar las bolas" aria-label="Reiniciar partida">↺</button>',
     '</div>',
-    '<p class="hint">Apunta en la mesa. Toca GOLPEAR o mantén para cargar; suelta para tirar. ESPACIO también carga. R reinicia.</p>',
+    '<p class="hint">Apunta sobre el paño · ← → ajustan la dirección · ESPACIO golpea · R reinicia.</p>',
     '<div class="fine-aim" role="group" aria-label="Ajuste fino de puntería">',
       '<button id="fine-left" class="fine-step" type="button" aria-label="Girar puntería 0,5 grados a la izquierda">↶ <span>0,5°</span></button>',
       '<div class="fine-status"><small>AJUSTE FINO</small><output id="fine-angle" aria-live="polite">0,0°</output></div>',
@@ -314,6 +318,20 @@ for (const x of [-3.72, 3.72]) for (const z of [-1.64, 1.64]) {
   box(0.37, 0.93, 0.37, x, -0.99, z, wood);
   box(0.39, 0.06, 0.39, x, -1.10, z, brass);
 }
+// Short gilded corner and side-pocket rail guards bring the approved table
+// silhouette into the *real* renderer. They remain outside the ball path;
+// pocket centres, jaws and the entire collision solver are unchanged.
+const railGuard = new THREE.MeshStandardMaterial({
+  color: 0xb88a45, roughness: 0.27, metalness: 0.82,
+  emissive: 0x42260c, emissiveIntensity: 0.09,
+});
+for (const xSide of [-1, 1]) for (const zSide of [-1, 1]) {
+  box(0.36, 0.042, 0.065, xSide * 4.21, 0.244, zSide * 2.32, railGuard);
+  box(0.065, 0.042, 0.37, xSide * 4.52, 0.244, zSide * 1.99, railGuard);
+}
+for (const zSide of [-1, 1]) for (const xSide of [-1, 1]) {
+  box(0.21, 0.042, 0.067, xSide * 0.40, 0.244, zSide * 2.32, railGuard);
+}
 
 // Full-curvature enamel colour and properly striped sphere maps.
 // Slightly more tessellation and contact shadows make balls read as polished
@@ -493,7 +511,8 @@ const spinChoices = [
 ];
 function updateSpinButton() {
   const choice = spinChoices.find((item) => item.value === cueSpin);
-  spinButton.textContent = choice.label;
+  spinButton.querySelector('.spin-name').textContent =
+    choice.value === 0 ? 'Centro' : choice.value > 0 ? 'Sigue' : 'Retro';
   spinButton.dataset.spin = String(choice.value);
   spinButton.setAttribute('aria-label', 'Efecto de la blanca: ' + choice.name + '. Pulsa para cambiar');
   spinButton.title = 'Efecto de la blanca: ' + choice.name + ' · pulsa para cambiar';
@@ -672,6 +691,11 @@ window.addEventListener('keydown', (event) => {
         strikeButton.classList.add('charging');
       }
     }
+    return;
+  }
+  if (!event.repeat && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+    event.preventDefault();
+    nudgeAim(event.key === 'ArrowLeft' ? -1 : 1);
     return;
   }
   if (!event.repeat && event.key.toLowerCase() === 'r') restart();
