@@ -23,7 +23,7 @@ app.innerHTML = [
       '<button id="mode-practice" type="button" aria-pressed="true" title="Práctica libre; cambiar reinicia la mesa">Práctica</button>',
       '<button id="mode-versus" type="button" aria-pressed="false" title="Partida local para dos jugadores; cambiar reinicia la mesa">2 jugadores</button>',
     '</div>',
-    '<div class="scoreboard" aria-live="polite">
+    '<div class="scoreboard" aria-live="polite">',
       '<div><span>TIROS</span><strong id="shots">00</strong></div>',
       '<div class="score-divider"></div>',
       '<div><span>EMBOCADAS</span><strong id="potted">00 <small>· ' + OBJECT_BALL_COUNT + ' en mesa</small></strong></div>',
@@ -46,7 +46,7 @@ app.innerHTML = [
     '<small>MATTHIAS · CRÍTICO DE PRECISIÓN</small>',
     '<p id="commentary" role="status">Guten Abend. Apunta sobre la mesa, elige potencia y golpea. Procura no humillarte.</p>',
     '</div></div>',
-    '<div class="shot-controls">
+    '<div class="shot-controls">',
       '<div class="power"><div class="power-heading"><span>POTENCIA</span><output id="power-value" for="power">55%</output></div>',
       '<input id="power" type="range" min="0" max="100" value="55" aria-label="Potencia del golpe" /></div>',
       '<button id="spin-cycle" class="spin-cycle" type="button" data-spin="0" aria-label="Efecto de la blanca: centro. Pulsa para cambiar" title="Efecto de la blanca: centro · pulsa para cambiar">● Centro</button>',
