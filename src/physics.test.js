@@ -110,7 +110,12 @@ test('glancing corner approach misses the now tighter pocket and reflects', () =
   for (let i = 0; i < 40; i++) events.push(...stepPhysics([ball], 1 / 120));
   assert.deepEqual(events, []);
   assert.equal(ball.pocketed, false);
-  assert.ok(ball.vx < 0, 'missed corner pockets are played from the cushion');
+  // A rounded shoulder may redirect the miss along the other axis rather
+  // than reversing x. What matters is an actual rejection away from the hole.
+  const startDistance = Math.hypot(4.33 - 4.15, 2.15 - 1.9);
+  const endDistance = Math.hypot(4.33 - ball.x, 2.15 - ball.z);
+  assert.ok(endDistance > startDistance + 0.1,
+    'a miss must be deflected away from the corner rather than leaking through');
 });
 
 test('every pocket has two mirrored rounded jaws inside the playable table', () => {
