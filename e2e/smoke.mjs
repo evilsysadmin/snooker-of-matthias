@@ -242,49 +242,65 @@ try {
       'new-release banner does not discard the game');
     await page.locator('#update-later').click();
     assert.equal(await page.locator('#update-banner').isHidden(), true);
-    // The optional local match must not disturb the normal practice golden path.
-    const matchStatus = page.locator('#match-status');
-    assert.equal(await matchStatus.isHidden(), true);
-    await page.locator('#mode-versus').click();
-    assert.equal(await page.locator('#mode-versus').getAttribute('aria-pressed'), 'true');
-    assert.equal(await matchStatus.isVisible(), true);
-    assert.match(await matchStatus.innerText(), /Jugador 1.*Saque/);
-    assert.equal(await page.locator('#shots').innerText(), '00', 'mode switch resets rack');
-    assert.equal(await page.locator('#viewport').getAttribute('data-game-mode'), 'versus');
-    // A low-power stroke reliably stops quickly on software WebGL CI.
-    // The cue cannot reach the distant rack: it must be adjudicated as an
-    // illegal no-contact break, awarding the second player ball-in-hand.
+    // Only solo modes are visible: the 2-player referee is retained in code
+    // but deliberately deferred from the product.
+    assert.equal(await page.locator('#mode-versus').count(), 0);
+    const soloStatus = page.locator('#solo-status');
+    assert.equal(await soloStatus.isHidden(), true);
+    await page.locator('#mode-solo').click();
+    assert.equal(await page.locator('#mode-solo').getAttribute('aria-pressed'), 'true');
+    assert.equal(await soloStatus.isVisible(), true);
+    assert.match(await soloStatus.innerText(), /Desafío 15.*15 restantes.*Sin récord/);
+    assert.equal(await page.locator('#viewport').getAttribute('data-game-mode'), 'solo');
+    assert.equal(await page.locator('#shots').innerText(), '00', 'switching modes reracks cleanly');
+
+    // A gentle real stroke stays short of the distant rack and gives a
+    // deterministic miss. It must count as one actual solo shot, never a pot.
     await page.locator('#power').evaluate((input) => {
       input.value = '5';
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
     await page.locator('#strike').click();
     await page.waitForFunction(() =>
-      document.querySelector('#match-status')?.dataset.shots === '1',
+      document.querySelector('#solo-status')?.dataset.shots === '1',
       undefined, { timeout: 25000 });
+    assert.equal(await soloStatus.getAttribute('data-outcome'), 'miss');
+    assert.equal(await soloStatus.getAttribute('data-remaining'), '15');
+    assert.equal(await soloStatus.getAttribute('data-streak'), '0');
+    assert.equal(await soloStatus.getAttribute('data-scratches'), '0');
     assert.equal(await page.locator('#shots').innerText(), '01');
-    assert.match(await matchStatus.innerText(), /Jugador [12]/);
-    assert.equal(await matchStatus.getAttribute('data-outcome'), 'foul',
-      'short no-contact break is a real foul');
-    assert.equal(await matchStatus.getAttribute('data-turn'), '2');
-    assert.equal(await page.locator('#viewport').getAttribute('data-cue-placement'), 'required');
+    assert.equal(await page.locator('#viewport').getAttribute('data-cue-placement'), '');
+
+    // Mode and camera buttons must be separate usable targets on mobile.
     if (config.isMobile) {
       const pair = await page.evaluate(() => ({
         camera: document.querySelector('.camera-switch').getBoundingClientRect().toJSON(),
         modes: document.querySelector('.mode-switch').getBoundingClientRect().toJSON(),
       }));
-      assert.ok(!overlaps(pair.camera, pair.modes), 'mobile mode controls do not cover camera controls');
+      assert.ok(!overlaps(pair.camera, pair.modes),
+        'mobile solo mode controls do not cover camera controls');
     }
     await page.screenshot({
-      path: 'artifacts/billiards-' + config.name + '-two-player.png',
+      path: 'artifacts/billiards-' + config.name + '-solo.png',
       fullPage: true, animations: 'disabled',
     });
+
+    // The record survives an explicit new rack. Storage is not used as a
+    // game-state oracle; the pure referee tests cover genuinely earned bests.
+    await page.evaluate(() => localStorage.setItem(
+      'shadowops.billiards.solo15.best.v1',
+      JSON.stringify({ version: 1, shots: 9, scratches: 1 }),
+    ));
+    await page.locator('#restart').click();
+    await page.waitForFunction(() =>
+      document.querySelector('#solo-status')?.dataset.shots === '0');
+    assert.match(await soloStatus.innerText(), /Récord: 9 tiros.*1 faltas/);
+    assert.equal(await page.locator('#shots').innerText(), '00');
     await page.locator('#mode-practice').click();
     await page.waitForFunction(() =>
-      document.querySelector('#shots')?.textContent === '00');
-    assert.equal(await matchStatus.isHidden(), true);
-    assert.equal(await page.locator('#viewport').getAttribute('data-game-mode'), 'practice');
-    assert.equal(await page.locator('#shots').innerText(), '00', 'practice reset is explicit');
+      document.querySelector('#viewport')?.dataset.gameMode === 'practice');
+    assert.equal(await soloStatus.isHidden(), true);
+    assert.equal(await page.locator('#shots').innerText(), '00');
     assert.deepEqual(errors, [], config.name + ' browser runtime errors');
     console.log('SNOOKER_BROWSER_' + config.name.toUpperCase() + '_PASS', dimensions);
     await context.close();
