@@ -11,6 +11,8 @@ import { remainingObjectBalls } from './practiceRules.js';
 import { createVersionWatcher } from './versionNotice.js';
 import { newSoloChallenge, settleSoloShot, readSoloBest, saveSoloBest } from './soloChallenge.js';
 import { createFeedbackGate, createBilliardsAudio } from './shotFeedback.js';
+import { poolBallSpec, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS,
+  createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture } from './poolVisuals.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -100,34 +102,44 @@ scene.fog = null;
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.30;
+renderer.toneMappingExposure = 1.18;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 viewport.appendChild(renderer.domElement);
 
-const hemi = new THREE.HemisphereLight(0xd4fce7, 0x21120a, 2.1);
+const hemi = new THREE.HemisphereLight(0xe1f5ec, 0x25160f, 1.65);
 scene.add(hemi);
-const key = new THREE.SpotLight(0xffe6bd, 150, 27, Math.PI / 3.3, 0.75, 1.35);
+const key = new THREE.SpotLight(0xffe6bf, 142, 27, Math.PI / 3.3, 0.73, 1.35);
 key.position.set(-1, 10, 2.3);
 key.target.position.set(0, 0, 0);
 key.castShadow = true;
 key.shadow.mapSize.set(1024, 1024);
 key.shadow.bias = -0.0002;
 scene.add(key, key.target);
-const fill = new THREE.DirectionalLight(0x8ddfd8, 2.2);
+const fill = new THREE.DirectionalLight(0x9bddd5, 1.65);
 fill.position.set(5, 6, -5);
 scene.add(fill);
 
-const wood = new THREE.MeshStandardMaterial({ color: 0x442a20, roughness: 0.48, metalness: 0.04 });
-const darkWood = new THREE.MeshStandardMaterial({ color: 0x251b17, roughness: 0.44 });
-const brass = new THREE.MeshStandardMaterial({ color: 0xb59b5c, roughness: 0.28, metalness: 0.75 });
-// Matte, aged inlay avoids specular white stripes along one edge under the spotlight.
-const railInlay = new THREE.MeshStandardMaterial({ color: 0x8f774b, roughness: 0.76, metalness: 0.25 });
-const felt = new THREE.MeshStandardMaterial({ color: 0x0c5a41, roughness: 0.98 });
-const cushion = new THREE.MeshStandardMaterial({ color: 0x165943, roughness: 0.95 });
-const pocketMaterial = new THREE.MeshStandardMaterial({ color: 0x030506, roughness: 1, side: THREE.DoubleSide });
-const pocketLeather = new THREE.MeshStandardMaterial({ color: 0x231b17, roughness: 0.92 });
-const noseFelt = new THREE.MeshStandardMaterial({ color: 0x20674e, roughness: 0.97 });
+const wood = new THREE.MeshStandardMaterial({
+  color: 0xffffff, map: createWalnutTexture(THREE),
+  roughness: 0.32, metalness: 0.06,
+});
+const darkWood = new THREE.MeshStandardMaterial({ color: 0x221914, roughness: 0.47 });
+const brass = new THREE.MeshStandardMaterial({
+  color: 0xb79957, roughness: 0.31, metalness: 0.72,
+});
+const railInlay = new THREE.MeshStandardMaterial({
+  color: 0xd5b46d, roughness: 0.41, metalness: 0.60,
+});
+const felt = new THREE.MeshStandardMaterial({
+  color: 0xffffff, map: createFeltTexture(THREE), roughness: 0.99,
+});
+const cushion = new THREE.MeshStandardMaterial({ color: 0x145b43, roughness: 0.94 });
+const pocketMaterial = new THREE.MeshStandardMaterial({
+  color: 0x020708, roughness: 1, side: THREE.DoubleSide,
+});
+const pocketLeather = new THREE.MeshStandardMaterial({ color: 0x21160f, roughness: 0.83 });
+const noseFelt = new THREE.MeshStandardMaterial({ color: 0x1b654b, roughness: 0.95 });
 
 function box(w, h, d, x, y, z, mat, parent = scene) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -150,6 +162,8 @@ box(9.35, 0.50, 4.94, 0, -0.36, 0, darkWood);
 box(9.25, 0.22, 4.84, 0, -0.07, 0, wood);
 box(8.92, 0.06, 4.48, 0, -0.005, 0, brass);
 box(8.70, 0.04, 4.30, 0, 0.032, 0, felt);
+// Thin, restrained shadow line separates the walnut crown from brass trim.
+box(9.29, 0.034, 4.86, 0, -0.168, 0, darkWood);
 for (const side of [-1, 1]) {
   // Split the long rails to expose the middle pockets.
   for (const half of [-1, 1]) {
@@ -172,6 +186,28 @@ for (const side of [-1, 1]) {
   shortNose.receiveShadow = true;
   scene.add(shortNose);
 }
+// Flush ivory/brass diamond sights across real wooden rails. Decorative
+// only: none intersects the physical cloth, pockets or ball collision solver.
+const railSight = new THREE.OctahedronGeometry(1, 0);
+const sightMaterial = new THREE.MeshStandardMaterial({
+  color: 0xf0d7a2, roughness: 0.25, metalness: 0.35,
+  emissive: 0x533714, emissiveIntensity: 0.08,
+});
+function addRailSight(x, z, angle = 0) {
+  const marker = new THREE.Mesh(railSight, sightMaterial);
+  marker.scale.set(0.045, 0.010, 0.029);
+  marker.position.set(x, 0.238, z);
+  marker.rotation.y = angle;
+  scene.add(marker);
+}
+for (const x of LONG_RAIL_SIGHTS) {
+  addRailSight(x, -2.37); addRailSight(x, 2.37);
+}
+for (const z of SHORT_RAIL_SIGHTS) {
+  addRailSight(-4.54, z, Math.PI / 2);
+  addRailSight(4.54, z, Math.PI / 2);
+}
+
 for (const [x, z, radius] of POCKETS) {
   const hole = new THREE.Mesh(new THREE.CircleGeometry(radius, 48), pocketMaterial);
   hole.rotation.x = -Math.PI / 2;
@@ -279,65 +315,46 @@ for (const x of [-3.72, 3.72]) for (const z of [-1.64, 1.64]) {
   box(0.39, 0.06, 0.39, x, -1.10, z, brass);
 }
 
-const ballGeo = new THREE.SphereGeometry(TABLE.ballRadius, 32, 24);
-// American pool: numbered solids 1–7, black 8, striped 9–15.
-const poolColors = [
-  0xfaf9ed, 0xf2c538, 0x255fbd, 0xb72731, 0x66419b,
-  0xe48a29, 0x258d5a, 0x753524, 0x121819,
-  0xf2c538, 0x255fbd, 0xb72731, 0x66419b,
-  0xe48a29, 0x258d5a, 0x753524,
-];
-function numberDecal(number) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 128, 128);
-  ctx.fillStyle = '#fffaf0';
-  ctx.beginPath();
-  ctx.arc(64, 64, 60, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#182023';
-  ctx.font = 'bold 76px Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(String(number), 64, 68);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
+// Full-curvature enamel colour and properly striped sphere maps.
+// Slightly more tessellation and contact shadows make balls read as polished
+// resin, not flat coloured dots. Never modify the physical ball radius.
+const ballGeo = new THREE.SphereGeometry(TABLE.ballRadius, 40, 32);
+const ballShadowGeo = new THREE.CircleGeometry(TABLE.ballRadius * 1.25, 32);
+const ballShadowMaterial = new THREE.MeshBasicMaterial({
+  color: 0x03120e, transparent: true, opacity: 0.18,
+  depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1,
+});
 function ballModel(number) {
+  const spec = poolBallSpec(number);
   const group = new THREE.Group();
-  const striped = number >= 9;
-  const ballColor = poolColors[number];
-  const base = new THREE.Mesh(ballGeo, new THREE.MeshPhysicalMaterial({
-    color: striped ? 0xfaf9ed : ballColor,
-    roughness: 0.15, clearcoat: 0.85, clearcoatRoughness: 0.12,
+  const shell = new THREE.Mesh(ballGeo, new THREE.MeshPhysicalMaterial({
+    map: createBallTexture(THREE, number),
+    color: 0xffffff,
+    roughness: 0.16, metalness: 0, clearcoat: 1,
+    clearcoatRoughness: 0.085, ior: 1.45,
   }));
-  base.castShadow = true;
-  base.receiveShadow = true;
-  group.add(base);
-  if (striped) {
-    group.add(new THREE.Mesh(
-      new THREE.SphereGeometry(TABLE.ballRadius * 1.006, 32, 20,
-        0, Math.PI * 2, Math.PI * 0.33, Math.PI * 0.34),
+  shell.castShadow = true;
+  shell.receiveShadow = true;
+  group.add(shell);
+  if (!spec.cue) {
+    const badge = new THREE.Mesh(
+      new THREE.CircleGeometry(TABLE.ballRadius * 0.44, 36),
       new THREE.MeshPhysicalMaterial({
-        color: ballColor, roughness: 0.15, clearcoat: 0.85,
-      }),
-    ));
-  }
-  if (number > 0) {
-    const decal = new THREE.Mesh(
-      new THREE.CircleGeometry(TABLE.ballRadius * 0.47, 24),
-      new THREE.MeshBasicMaterial({
-        map: numberDecal(number), transparent: true, depthWrite: false,
+        map: createNumberTexture(THREE, number),
+        transparent: true, depthWrite: false,
+        roughness: 0.18, clearcoat: 0.75,
         side: THREE.DoubleSide,
       }),
     );
-    decal.rotation.x = -Math.PI / 2;
-    decal.position.y = TABLE.ballRadius * 1.006;
-    group.add(decal);
+    badge.rotation.x = -Math.PI / 2;
+    badge.position.y = TABLE.ballRadius * 1.004;
+    group.add(badge);
   }
+  const contact = new THREE.Mesh(ballShadowGeo, ballShadowMaterial);
+  contact.rotation.x = -Math.PI / 2;
+  contact.position.y = -TABLE.ballRadius + 0.005;
+  contact.renderOrder = 0;
+  group.add(contact);
   scene.add(group);
   return group;
 }
