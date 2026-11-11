@@ -1,4 +1,4 @@
-import { TABLE, POCKET_JAWS } from './physics.js';
+import { TABLE, POCKETS, POCKET_JAWS } from './physics.js';
 
 // Returns where the white ball's CENTRE first reaches a stationary ball or a
 // cushion when travelling along the chosen direction. Pure geometry only:
@@ -56,5 +56,25 @@ export function predictFirstContact(balls, dx, dz) {
       jawIndex = index;
     }
   }
-  return { x: cue.x + distance * ux, z: cue.z + distance * uz, distance, ballId, jawIndex };
+  // Physics captures a ball as soon as its centre enters an actual pocket
+  // circle, before wall and jaw response. A guide ending at the straight
+  // cushion would incorrectly imply a bounce for a clean direct pot.
+  let pocketIndex = null;
+  for (let index = 0; index < POCKETS.length; index++) {
+    const [px, pz, radius] = POCKETS[index];
+    const rx = px - cue.x, rz = pz - cue.z;
+    const projection = rx * ux + rz * uz;
+    if (projection < 0) continue;
+    const missSquared = Math.max(0, rx * rx + rz * rz - projection * projection);
+    // Tangency alone is not pocketing: capturePocket uses strict < radius.
+    if (missSquared >= radius * radius) continue;
+    const travel = projection - Math.sqrt(radius * radius - missSquared);
+    if (travel < 0 || travel >= distance - 1e-9) continue;
+    distance = travel;
+    ballId = null;
+    jawIndex = null;
+    pocketIndex = index;
+  }
+  return { x: cue.x + distance * ux, z: cue.z + distance * uz,
+    distance, ballId, jawIndex, pocketIndex };
 }
