@@ -408,6 +408,25 @@ function ballModel(number) {
       circle.position.y = -TABLE.ballRadius + y;
       ring.add(circle);
     }
+    // Short, opposed locator ticks make the cue identifiable from a glance
+    // in portrait/phone framing. Physically small, fixed to the ball position,
+    // and hidden with the ring while balls are rolling.
+    const tickWidth = TABLE.ballRadius * CUE_BALL_MARKER.tickLengthScale;
+    for (const sign of [-1, 1]) {
+      for (const [widthScale, material, y] of [
+        [1.34, cueRingBaseMaterial, 0.018],
+        [1, cueRingMaterial, 0.023],
+      ]) {
+        const tick = new THREE.Mesh(
+          new THREE.BoxGeometry(tickWidth * widthScale, 0.004,
+            TABLE.ballRadius * (widthScale === 1 ? 0.13 : 0.25)),
+          material,
+        );
+        tick.position.set(sign * TABLE.ballRadius *
+          CUE_BALL_MARKER.tickDistanceScale, -TABLE.ballRadius + y, 0);
+        ring.add(tick);
+      }
+    }
     group.userData.cueRing = ring;
     group.add(ring);
   } else {
@@ -1150,6 +1169,8 @@ function frame(now) {
   // retain exactly the same sphere geometry and collision behaviour.
   models.get(0).userData.cueRing.visible =
     !nowMoving && !balls[0].pocketed && !scratchPending;
+  // Expose the real mesh state to browser E2E, not an unrelated UI flag.
+  viewport.dataset.cueLocator = models.get(0).userData.cueRing.visible ? 'ready' : '';
   updateCue(now);
   animatePocketPulses(now);
   renderer.render(scene, camera);
