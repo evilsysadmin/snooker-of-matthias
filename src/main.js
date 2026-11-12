@@ -72,6 +72,9 @@ app.innerHTML = [
       '</button>',
       '<button id="strike" class="strike" type="button" aria-label="Golpear: toca para usar la potencia elegida, mantén pulsado para cargar" title="Toca para golpear · mantén pulsado para cargar"><span>⚡</span> GOLPEAR <kbd>ESPACIO</kbd></button>',
       '<button id="restart" class="restart" type="button" title="Recolocar las bolas" aria-label="Reiniciar partida">↺</button>',
+      '<button id="precision-zoom-compact" class="precision-zoom-compact" type="button"',
+        ' aria-pressed="false" aria-label="Activar zoom de precisión con Z"',
+        ' title="Zoom de precisión · tecla Z">Zoom</button>',
     '</div>',
     '<p class="hint">Apunta sobre el paño · ← → ajustan la dirección · ESPACIO golpea · R reinicia.</p>',
     '<div class="fine-aim" role="group" aria-label="Ajuste fino de puntería">',
@@ -101,6 +104,7 @@ const powerValue = document.querySelector('#power-value');
 const topCameraButton = document.querySelector('#camera-top');
 const perspectiveCameraButton = document.querySelector('#camera-3d');
 const precisionZoomButton = document.querySelector('#precision-zoom');
+const compactZoomButton = document.querySelector('#precision-zoom-compact');
 const fineLeft = document.querySelector('#fine-left');
 const fineRight = document.querySelector('#fine-right');
 const fineAngle = document.querySelector('#fine-angle');
@@ -802,6 +806,14 @@ window.addEventListener('keydown', (event) => {
   // Keep native Space activation for focused buttons/sliders (including camera controls).
   if (event.target instanceof HTMLButtonElement || event.target instanceof HTMLInputElement ||
       event.altKey || event.ctrlKey || event.metaKey) return;
+  // The existing optical camera is also reachable on ordinary laptops.
+  // Focused form controls and browser modifier shortcuts stay native.
+  if (event.code === 'KeyZ' && !event.repeat && !event.shiftKey &&
+      window.innerWidth >= 1050) {
+    event.preventDefault();
+    togglePrecisionZoom();
+    return;
+  }
   // Keyboard zoom uses the same camera-only clamp as the wheel. Respect
   // focused controls and Ctrl/Cmd browser zoom shortcuts above.
   if (precisionZoom && camera === topCamera && !event.shiftKey &&
@@ -1127,6 +1139,15 @@ function syncTopFraming() {
   precisionZoomButton.title = precisionZoom
     ? 'Rueda o +/−: zoom 1,2×–2,2× · botón derecho/Mayús + arrastrar: mover · pulsa para ver la mesa'
     : 'Ampliar la puntería sin alterar el tiro';
+  compactZoomButton.setAttribute('aria-pressed', String(precisionZoom));
+  compactZoomButton.textContent = precisionZoom
+    ? precisionZoomLevel.toFixed(1).replace('.', ',') + '×' : 'Zoom';
+  compactZoomButton.setAttribute('aria-label', precisionZoom
+    ? 'Restaurar mesa completa, tecla Z' : 'Activar zoom de precisión, tecla Z');
+  compactZoomButton.title = precisionZoom
+    ? 'Zoom ' + precisionZoomLevel.toFixed(1).replace('.', ',') +
+      '× · rueda o +/- para ajustar · tecla Z para salir'
+    : 'Zoom de precisión de 1,4× a 2,2× · tecla Z';
 }
 function resize() {
   const rect = viewport.getBoundingClientRect();
@@ -1208,7 +1229,7 @@ function setCameraMode(mode) {
 }
 topCameraButton.addEventListener('click', () => setCameraMode('top'));
 perspectiveCameraButton.addEventListener('click', () => setCameraMode('3d'));
-precisionZoomButton.addEventListener('click', () => {
+function togglePrecisionZoom() {
   if (!precisionZoom) {
     const cue = balls[0]?.pocketed ? null : balls[0];
     const prediction = cue && !ballsMoving(balls)
@@ -1226,7 +1247,9 @@ precisionZoomButton.addEventListener('click', () => {
   setCameraMode('top');
   syncTopFraming();
   lensPositionDirty = true;
-});
+}
+precisionZoomButton.addEventListener('click', togglePrecisionZoom);
+compactZoomButton.addEventListener('click', togglePrecisionZoom);
 // Position the phone playfield against the *real* control panel height.
 // Commentary can wrap to more lines on smaller phones. A fixed CSS bottom
 // caused an actual 4 px overlap at 390 px even though visual mockups fit.
