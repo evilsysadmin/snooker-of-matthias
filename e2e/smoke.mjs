@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { chromium } from '@playwright/test';
 import { samplePngRGB, screenshotShowsFelt } from './pngFeltProbe.mjs';
-import { TOP_CAMERA_FILL } from '../src/poolVisuals.js';
+import { TOP_CAMERA_FILL, PRECISION_ZOOM } from '../src/poolVisuals.js';
 
 mkdirSync('artifacts', { recursive: true });
 const browser = await chromium.launch({
@@ -76,6 +76,8 @@ try {
     assert.ok(!overlaps(layout.switcher, layout.scoreboard), 'camera switch clears scoreboard');
     assert.ok(layout.switcher.bottom < layout.controls.top, 'camera switch clears controls');
     if (config.isMobile) {
+      assert.equal(await page.locator('#precision-zoom').isVisible(), false,
+        'portrait phone keeps its uncluttered controls');
       assert.ok(layout.switcher.bottom <= layout.viewport.top + 35,
         'mobile camera selector stays above the upper tabletop cushion');
     }
@@ -121,6 +123,8 @@ try {
     assert.equal(await spinControl.getAttribute('data-spin'), '1');
     assert.equal(await page.locator('#shots').innerText(), '00', 'spin choice never fires a shot');
     if (!config.isMobile) {
+      assert.equal(await page.locator('#precision-zoom').isVisible(), false,
+        'standard desktop keeps camera controls off its six-pocket tabletop');
       assert.equal(await page.locator('.fine-aim').isVisible(), true,
         'canonical wide desktop HUD shows precise aiming controls');
       // Unfocused arrow keys use the same deterministic 0.5-degree nudges.
@@ -539,6 +543,36 @@ try {
     'wide landscape physical table should fill at least 68% of browser width');
   assert.ok(wideLayout.switcher.left >= (wideLayout.windowWidth + wideTableWidth) / 2,
     'the camera toggle must stay in the side gutter, off the playable table');
+  // The real user's 1814x832 desktop: optical close-up must preserve the
+  // geometric aim ray, never scale the WebGL canvas or ball physics.
+  const rackX = wideLayout.windowWidth / 2 + 2.05 * wideTableWidth / 9.5;
+  const rackY = wideLayout.viewport.top + wideLayout.viewport.height / 2;
+  await widePage.mouse.move(rackX, rackY);
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
+  const zoom = widePage.locator('#precision-zoom');
+  assert.equal(await zoom.isVisible(), true, 'wide desktop offers optical precision');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'full');
+  await zoom.click();
+  assert.equal(await zoom.getAttribute('aria-pressed'), 'true');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'precision');
+  assert.equal(await widePage.locator('#shots').innerText(), '00');
+  const closeRackX = wideLayout.windowWidth / 2 +
+    (2.05 + 0.175) * (wideTableWidth / 9.5) * PRECISION_ZOOM;
+  await widePage.mouse.move(closeRackX, rackY);
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
+  const zoomPng = await widePage.screenshot({
+    path: 'artifacts/snooker-wide-precision-top.png',
+    fullPage: true, animations: 'disabled',
+  });
+  assert.ok(screenshotShowsFelt(zoomPng, wideLayout.viewport),
+    'precision must render the true 3D felt, not a CSS-scaled fake');
+  await zoom.click();
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'full');
+  await zoom.click();
+  await widePage.locator('#camera-3d').click();
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'full',
+    'changing to 3D restores full-table framing');
+  await widePage.locator('#camera-top').click();
   const widePng = await widePage.screenshot({
     path: 'artifacts/snooker-wide-desktop-top.png',
     fullPage: true, animations: 'disabled',

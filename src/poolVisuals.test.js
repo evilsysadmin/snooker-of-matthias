@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BALL_COLORS, CUE_BALL_MARKER, TOP_CAMERA_FILL, STRIPE_IVORY, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS, poolBallSpec,
+  BALL_COLORS, CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, precisionFocus, STRIPE_IVORY, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS, poolBallSpec,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
 } from './poolVisuals.js';
 
@@ -25,6 +25,17 @@ test('tight orthographic framing magnifies the whole table without clipping its 
   const projectedWidth = 9.5 * desktopHeight / (2 * heightWorld);
   assert.ok(projectedWidth / desktopWidth > 0.6,
     'a short laptop should display a large tabletop, rather than giant side gutters');
+});
+
+test('precision zoom focuses the real cue-to-target segment, leaving physics untouched', () => {
+  assert.ok(PRECISION_ZOOM > 1.25 && PRECISION_ZOOM <= 1.5);
+  const focus = precisionFocus({ x: -2.4, z: 0 }, { x: 2.05, z: 0 });
+  assert.ok(Math.abs(focus.x + 0.175) < 1e-10);
+  assert.equal(focus.z, 0);
+  assert.deepEqual(precisionFocus({ x: -2.4, z: 1.6 }, null), { x: -2.4, z: 1.6 });
+  assert.deepEqual(precisionFocus(null, null), { x: 0, z: 0 });
+  assert.ok(PRECISION_ZOOM * TOP_CAMERA_FILL > 1,
+    'the close-up is opt-in; full table remains the default');
 });
 
 test('the cue has a visible unique marker, unchanged physics size and muted stripe white', () => {

@@ -15,7 +15,7 @@ import { newSoloChallenge, settleSoloShot, readSoloBest, saveSoloBest } from './
 import { createFeedbackGate, createBilliardsAudio } from './shotFeedback.js';
 import { poolBallSpec, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
-  CUE_BALL_MARKER, TOP_CAMERA_FILL } from './poolVisuals.js';
+  CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, precisionFocus } from './poolVisuals.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -53,6 +53,8 @@ app.innerHTML = [
   '<div class="camera-switch" role="group" aria-label="Vista de cámara">',
     '<button id="camera-top" class="camera-option" type="button" aria-pressed="true">Cenital</button>',
     '<button id="camera-3d" class="camera-option" type="button" aria-pressed="false">3D</button>',
+    '<button id="precision-zoom" class="camera-option precision-zoom" type="button" aria-pressed="false"',
+      ' aria-label="Acercar la mesa 1,4 veces en vista cenital" title="Ampliar puntería sin cambiar el tiro">Zoom ×1,4</button>',
   '</div>',
   '<section class="bottom-panel" aria-label="Controles de billar">',
     '<div class="commentary"><div class="monogram">M</div><div>',
@@ -97,6 +99,7 @@ const powerInput = document.querySelector('#power');
 const powerValue = document.querySelector('#power-value');
 const topCameraButton = document.querySelector('#camera-top');
 const perspectiveCameraButton = document.querySelector('#camera-3d');
+const precisionZoomButton = document.querySelector('#precision-zoom');
 const fineLeft = document.querySelector('#fine-left');
 const fineRight = document.querySelector('#fine-right');
 const fineAngle = document.querySelector('#fine-angle');
@@ -116,6 +119,8 @@ const perspectiveFog = new THREE.FogExp2('#071316', 0.026);
 const perspectiveCamera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
 const topCamera = new THREE.OrthographicCamera(-5, 5, 5, -5, 0.1, 100);
 let camera = topCamera;
+let precisionZoom = false;
+let precisionAnchor = { x: 0, z: 0 };
 scene.fog = null;
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -645,6 +650,11 @@ function formatScore() {
     ' <small>· ' + remainingObjectBalls(balls) + ' en mesa</small>';
 }
 function restart() {
+  // New rack and mode changes never inherit an old cropped view.
+  if (precisionZoom) {
+    precisionZoom = false;
+    syncTopFraming();
+  }
   cancelCharge();
   feedbackGate.reset();
   for (const pulse of pocketPulses) pulse.ring.visible = false;
@@ -969,6 +979,19 @@ for (const x of [-4.75, 4.75]) {
   }
 }
 const projectedCorner = new THREE.Vector3();
+function syncTopFraming() {
+  const focus = precisionZoom ? precisionAnchor : { x: 0, z: 0 };
+  topCamera.zoom = precisionZoom ? PRECISION_ZOOM : 1;
+  topCamera.position.set(focus.x, 20, focus.z);
+  topCamera.lookAt(focus.x, 0, focus.z);
+  topCamera.updateProjectionMatrix();
+  topCamera.updateMatrixWorld();
+  viewport.dataset.zoom = precisionZoom ? 'precision' : 'full';
+  precisionZoomButton.setAttribute('aria-pressed', String(precisionZoom));
+  precisionZoomButton.textContent = precisionZoom ? 'Ver mesa' : 'Zoom ×1,4';
+  precisionZoomButton.setAttribute('aria-label', precisionZoom
+    ? 'Restaurar vista completa de la mesa' : 'Acercar la mesa 1,4 veces en vista cenital');
+}
 function resize() {
   const rect = viewport.getBoundingClientRect();
   const width = Math.max(1, rect.width), height = Math.max(1, rect.height);
@@ -998,10 +1021,7 @@ function resize() {
   topCamera.top = halfHeight;
   topCamera.bottom = -halfHeight;
   topCamera.up.set(portrait ? 1 : 0, 0, portrait ? 0 : -1);
-  topCamera.position.set(0, 20, 0);
-  topCamera.lookAt(0, 0, 0);
-  topCamera.updateProjectionMatrix();
-  topCamera.updateMatrixWorld();
+  syncTopFraming();
 
   // Keep the existing cinema-style perspective fitting for the 3D option.
   perspectiveCamera.aspect = aspect;
@@ -1034,6 +1054,10 @@ function resize() {
   if (sizeChanged) renderer.render(scene, camera);
 }
 function setCameraMode(mode) {
+  if (mode === '3d' && precisionZoom) {
+    precisionZoom = false;
+    syncTopFraming();
+  }
   camera = mode === '3d' ? perspectiveCamera : topCamera;
   lensPositionDirty = true;
   scene.fog = mode === '3d' ? perspectiveFog : null;
@@ -1043,6 +1067,20 @@ function setCameraMode(mode) {
 }
 topCameraButton.addEventListener('click', () => setCameraMode('top'));
 perspectiveCameraButton.addEventListener('click', () => setCameraMode('3d'));
+precisionZoomButton.addEventListener('click', () => {
+  if (!precisionZoom) {
+    const cue = balls[0]?.pocketed ? null : balls[0];
+    const prediction = cue && !ballsMoving(balls)
+      ? predictFirstContact(balls, aim.x, aim.z) : null;
+    const target = prediction?.ballId == null ? null
+      : balls.find((ball) => ball.id === prediction.ballId && !ball.pocketed);
+    precisionAnchor = precisionFocus(cue, target);
+  }
+  precisionZoom = !precisionZoom;
+  setCameraMode('top');
+  syncTopFraming();
+  lensPositionDirty = true;
+});
 // Position the phone playfield against the *real* control panel height.
 // Commentary can wrap to more lines on smaller phones. A fixed CSS bottom
 // caused an actual 4 px overlap at 390 px even though visual mockups fit.
