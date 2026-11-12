@@ -566,7 +566,7 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
 /* Progressive disclosure: only very wide screens have a gutter for an
    optional close-up without hiding any pocket behind camera buttons. */
 .precision-zoom { display: none; }
-@media (min-width: 1700px) and (min-height: 740px) {
+@media (min-width: 1700px) and (min-height: 740px) and (min-aspect-ratio: 13/6) {
   .precision-zoom {
     display: block;
     min-width: 106px;
