@@ -507,6 +507,55 @@ try {
   console.log('SNOOKER_BROWSER_COMPACT_LAPTOP_PASS',
     { viewport: compact.viewport.height, tableWidth: Math.round(tableWidthPx) });
   await laptop.close();
+
+  // 1814x832 is the player's real screenshot resolution. Without the
+  // compact wide-desktop chrome the entire *physical* table was undersized.
+  const wide = await browser.newContext({
+    viewport: { width: 1814, height: 832 }, deviceScaleFactor: 1,
+  });
+  const widePage = await wide.newPage();
+  const wideErrors = [];
+  widePage.on('pageerror', (error) => wideErrors.push(error.message));
+  await widePage.goto('http://127.0.0.1:4173/', { waitUntil: 'load' });
+  await widePage.locator('#viewport canvas').waitFor({ state: 'visible' });
+  await widePage.waitForTimeout(450);
+  const wideLayout = await widePage.evaluate(() => {
+    const rect = (q) => document.querySelector(q).getBoundingClientRect().toJSON();
+    return { viewport: rect('#viewport'), header: rect('.topbar'),
+      controls: rect('.bottom-panel'), switcher: rect('.camera-switch'),
+      windowWidth: window.innerWidth };
+  });
+  assert.ok(wideLayout.viewport.top >= wideLayout.header.bottom - 1,
+    'wide tabletop must remain below the full header');
+  assert.ok(wideLayout.viewport.bottom <= wideLayout.controls.top + 1,
+    'wide tabletop must not hide behind the lower control rail');
+  assert.ok(wideLayout.viewport.height >= 680,
+    'wide landscape should reclaim vertical room instead of tiny balls');
+  const wideAspect = wideLayout.viewport.width / wideLayout.viewport.height;
+  const wideHalfHeight = Math.max(2.51 / TOP_CAMERA_FILL,
+    4.75 / (wideAspect * TOP_CAMERA_FILL));
+  const wideTableWidth = 9.5 * wideLayout.viewport.height / (2 * wideHalfHeight);
+  assert.ok(wideTableWidth / wideLayout.windowWidth >= 0.68,
+    'wide landscape physical table should fill at least 68% of browser width');
+  assert.ok(wideLayout.switcher.left >= (wideLayout.windowWidth + wideTableWidth) / 2,
+    'the camera toggle must stay in the side gutter, off the playable table');
+  const widePng = await widePage.screenshot({
+    path: 'artifacts/snooker-wide-desktop-top.png',
+    fullPage: true, animations: 'disabled',
+  });
+  assert.ok(screenshotShowsFelt(widePng, wideLayout.viewport),
+    'enlarged wide desktop must still render real 3D felt');
+  await widePage.locator('#mode-solo').click();
+  const soloWide = await widePage.evaluate(() => ({
+    tabletop: document.querySelector('#viewport').getBoundingClientRect().toJSON(),
+    solo: document.querySelector('#solo-status').getBoundingClientRect().toJSON(),
+  }));
+  assert.ok(soloWide.tabletop.top >= soloWide.solo.bottom - 1,
+    'solo challenge status must stay clear of the enlarged table');
+  assert.deepEqual(wideErrors, [], 'wide desktop browser runtime errors');
+  console.log('SNOOKER_BROWSER_WIDE_DESKTOP_PASS',
+    { viewport: wideLayout.viewport.height, tableWidth: Math.round(wideTableWidth) });
+  await wide.close();
 } finally {
   await browser.close();
 }
