@@ -15,6 +15,17 @@ export const BALL_COLORS = Object.freeze([
 export const TOP_CAMERA_FILL = 0.965;
 // Optical-only precision aid: ball physics and pocket sizes are unchanged.
 export const PRECISION_ZOOM = 1.4;
+export const MIN_PRECISION_ZOOM = 1.2;
+export const MAX_PRECISION_ZOOM = 2.2;
+export const PRECISION_ZOOM_STEP = 0.1;
+// Wheel and keyboard changes are quantised, bounded and UI-only. Keep the
+// zoom model independent of Three.js so its limits are covered by node tests.
+export function adjustPrecisionZoom(current, steps) {
+  if (!Number.isFinite(current) || !Number.isFinite(steps)) return PRECISION_ZOOM;
+  const tenth = Math.round(current * 10) + Math.trunc(steps);
+  return Math.max(MIN_PRECISION_ZOOM, Math.min(MAX_PRECISION_ZOOM,
+    Math.round(tenth * PRECISION_ZOOM_STEP * 10) / 10));
+}
 // Camera movement only; coordinates are table units and never enter physics.
 // Clamp the visual target so a long gesture cannot lose the table completely.
 export function panPrecisionFocus(anchor, deltaX, deltaZ, limitX, limitZ) {
