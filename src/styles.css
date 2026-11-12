@@ -29,7 +29,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #e4c987; outline-
 .scoreboard strong { font: 800 24px/1 Manrope, sans-serif; font-variant-numeric: tabular-nums; }
 .scoreboard strong small { font-size: 12px; color: #758f82; }
 .score-divider { height: 28px; width: 1px; background: #d0edcc26; }
-.table-label { top: 97px; left: 50%; transform: translateX(-50%); display: flex; white-space: nowrap; align-items: center; gap: 9px; padding: 8px 14px; border: 1px solid #d8e9d124; background: #091d1ed6; border-radius: 99px; color: #aebfb3; font-size: 9px; }
+.table-label { top: 52px; left: 50%; transform: translateX(-50%); display: flex; white-space: nowrap; align-items: center; gap: 9px; padding: 8px 14px; border: 1px solid #d8e9d124; background: #091d1ed6; border-radius: 99px; color: #aebfb3; font-size: 9px; }
 .table-label-dot { width: 6px; height: 6px; background: #8fd6b4; border-radius: 50%; box-shadow: 0 0 8px #8fd6b488; }
 .camera-switch { top: 98px; right: clamp(16px, 3.8vw, 56px); display: flex; gap: 3px; padding: 4px; background: #091d1ede; border: 1px solid #d8e9d12e; border-radius: 12px; backdrop-filter: blur(12px); }
 .camera-option { min-width: 70px; min-height: 36px; padding: 0 12px; border-radius: 8px; background: transparent; color: #b4c8bc; font-size: 12px; font-weight: 700; }
@@ -168,9 +168,9 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
 /* Wide desktop: one compact control rail below an enlarged playfield.
    The breakpoints deliberately leave the original stacked/mobile HUD intact. */
 @media (min-width: 1050px) and (min-height: 650px) {
-  #viewport { inset: 92px 0 110px; }
+  #viewport { inset: 80px 0 110px; }
   .camera-switch { top: 93px; }
-  .table-label { top: 89px; }
+  .table-label { top: 52px; }
   .bottom-panel {
     width: min(1220px, calc(100% - 36px));
     bottom: max(9px, env(safe-area-inset-bottom));
@@ -457,7 +457,10 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   }
 }
 @media (max-width: 700px) and (min-height: 700px) {
-  #viewport { top: 96px; bottom: 195px; }
+  #viewport { top: 82px; bottom: 195px; }
+  /* In challenge mode the mission pill retains its own space above the
+     first pocket; free practice gets the maximum uninterrupted playfield. */
+  #viewport[data-game-mode="solo"] { top: 120px; }
   .solo-status { top: 99px; }
   /* The manual update action remains accessible and cannot overlap header,
      fine-aim, camera or strike controls on a phone. */
@@ -492,4 +495,27 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   letter-spacing: .035em; white-space: nowrap; }
 @media (max-width: 700px) and (min-height: 700px) {
   .target-lens:not([hidden]) { display: grid; }
+}
+
+/* Laptop screens with little vertical room previously stacked commentary,
+   controls and a huge empty gap beneath an undersized table. Use a compact
+   two-column control rail, keeping *all* inputs outside the playable canvas.
+   The camera's tighter full-table fit then enlarges every ball without
+   changing any physical radius or hiding pockets. */
+@media (min-width: 1050px) and (max-height: 649px) {
+  #viewport { inset: 80px 0 112px; }
+  .table-label { top: 52px; }
+  .bottom-panel {
+    width: min(1170px, calc(100% - 28px));
+    bottom: 9px;
+    padding: 9px 13px;
+    display: grid;
+    grid-template-columns: minmax(230px, 330px) minmax(0, 1fr);
+    align-items: center;
+    gap: 14px;
+  }
+  .commentary { margin-bottom: 0; }
+  .shot-controls { min-width: 0; gap: 11px; }
+  .power { min-width: 105px; }
+  .hint { display: none; }
 }
