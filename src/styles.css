@@ -519,3 +519,46 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   .power { min-width: 105px; }
   .hint { display: none; }
 }
+
+/* Wide, medium-height desktops (e.g. 1814 x 832): the table was limited by
+   a tall top chrome and a tall bottom rail, not by the monitor width. Reclaim
+   vertical pixels to enlarge the *real* orthographic table and every ball.
+   Only the presentation changes; physical radii, aim and pockets do not. */
+@media (min-width: 1600px) and (min-height: 740px) {
+  #viewport { inset: 68px 0 79px; }
+  /* Solo progress belongs in the clear header band, never over a pocket. */
+  #viewport[data-game-mode="solo"] { top: 108px; }
+  .topbar { top: 8px; }
+  .brand { gap: 10px; }
+  .brand-icon { width: 36px; height: 36px; font-size: 22px; }
+  .brand-copy small { font-size: 8px; margin-bottom: 2px; }
+  .brand-copy strong { font-size: clamp(18px, 1.1vw, 21px); }
+  .scoreboard { padding: 6px 12px; }
+  .scoreboard strong { font-size: 22px; }
+  .mode-switch { top: 5px; }
+  /* In this width class, place the camera selector in the free side gutter. */
+  .camera-switch { top: 76px; right: 12px; }
+  .table-label { display: none; }
+  .solo-status { top: 66px; }
+  .bottom-panel {
+    min-height: 0;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    padding: 5px 14px;
+  }
+  .commentary { min-width: 0; }
+  .monogram { width: 30px; height: 30px; flex-basis: 30px; font-size: 21px; }
+  .commentary small { font-size: 8px; }
+  .commentary p {
+    margin-top: 3px;
+    font-size: 12px;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+  .shot-controls { align-items: center; }
+  .power { padding-bottom: 0; }
+  .spin-cycle { min-height: 52px; padding: 3px 6px; }
+  .spin-disc { width: 25px; height: 25px; flex-basis: 25px; }
+}
