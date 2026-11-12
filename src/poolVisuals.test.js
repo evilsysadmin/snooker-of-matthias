@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BALL_COLORS, CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, precisionFocus, panPrecisionFocus, STRIPE_IVORY, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS, poolBallSpec,
+  BALL_COLORS, CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, MIN_PRECISION_ZOOM, MAX_PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus, STRIPE_IVORY, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS, poolBallSpec,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
 } from './poolVisuals.js';
 
@@ -36,6 +36,20 @@ test('precision zoom focuses the real cue-to-target segment, leaving physics unt
   assert.deepEqual(precisionFocus(null, null), { x: 0, z: 0 });
   assert.ok(PRECISION_ZOOM * TOP_CAMERA_FILL > 1,
     'the close-up is opt-in; full table remains the default');
+});
+
+test('graduated optical zoom is discrete, clamped and deterministic', () => {
+  assert.equal(adjustPrecisionZoom(PRECISION_ZOOM, 1), 1.5);
+  assert.equal(adjustPrecisionZoom(PRECISION_ZOOM, -1), 1.3);
+  assert.equal(adjustPrecisionZoom(1.5, 2), 1.7);
+  assert.equal(adjustPrecisionZoom(1.5, -3), MIN_PRECISION_ZOOM);
+  assert.equal(adjustPrecisionZoom(2.0, 50), MAX_PRECISION_ZOOM);
+  assert.equal(adjustPrecisionZoom(MAX_PRECISION_ZOOM, -1), 2.1);
+  assert.equal(adjustPrecisionZoom(1.4, 0.9), 1.4,
+    'fractional scroll noise cannot create unstable scale');
+  assert.equal(adjustPrecisionZoom(NaN, 1), PRECISION_ZOOM);
+  assert.equal(adjustPrecisionZoom(1.4, Infinity), PRECISION_ZOOM);
+  assert.equal(PRECISION_ZOOM, 1.4, 'initial opt-in view remains 1.4x');
 });
 
 test('precision camera panning is bounded and leaves game coordinates untouched', () => {

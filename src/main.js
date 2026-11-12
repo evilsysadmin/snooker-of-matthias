@@ -15,7 +15,7 @@ import { newSoloChallenge, settleSoloShot, readSoloBest, saveSoloBest } from './
 import { createFeedbackGate, createBilliardsAudio } from './shotFeedback.js';
 import { poolBallSpec, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
-  CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, precisionFocus, panPrecisionFocus } from './poolVisuals.js';
+  CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus } from './poolVisuals.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -120,6 +120,7 @@ const perspectiveCamera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
 const topCamera = new THREE.OrthographicCamera(-5, 5, 5, -5, 0.1, 100);
 let camera = topCamera;
 let precisionZoom = false;
+let precisionZoomLevel = PRECISION_ZOOM;
 let precisionAnchor = { x: 0, z: 0 };
 scene.fog = null;
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -775,6 +776,14 @@ window.addEventListener('keydown', (event) => {
   // Keep native Space activation for focused buttons/sliders (including camera controls).
   if (event.target instanceof HTMLButtonElement || event.target instanceof HTMLInputElement ||
       event.altKey || event.ctrlKey || event.metaKey) return;
+  // Keyboard zoom uses the same camera-only clamp as the wheel. Respect
+  // focused controls and Ctrl/Cmd browser zoom shortcuts above.
+  if (precisionZoom && camera === topCamera && !event.shiftKey &&
+      ['+', '=', '-', '_'].includes(event.key)) {
+    event.preventDefault();
+    changePrecisionZoom(event.key === '+' || event.key === '=' ? 1 : -1);
+    return;
+  }
   // Shift + arrows pan the precision camera; unmodified arrows keep their
   // original 0.5-degree aiming contract. No shot or physics calls here.
   if (precisionZoom && camera === topCamera && event.shiftKey &&
@@ -856,6 +865,16 @@ function finishPan(event) {
 canvas.addEventListener('contextmenu', (event) => {
   if (precisionZoom && camera === topCamera) event.preventDefault();
 });
+// Only deliberate zoom view consumes the wheel. Normal gameplay and 3D
+// retain their existing browser input behavior.
+canvas.addEventListener('wheel', (event) => {
+  if (!precisionZoom || camera !== topCamera) return;
+  event.preventDefault();
+  const unit = event.deltaMode === 1 ? 24 : event.deltaMode === 2 ? 200 : 120;
+  const steps = Math.sign(-event.deltaY) *
+    Math.min(10, Math.max(1, Math.ceil(Math.abs(event.deltaY) / unit)));
+  if (event.deltaY !== 0) changePrecisionZoom(steps);
+}, { passive: false });
 canvas.addEventListener('pointerdown', (event) => {
   // Pan gestures never call pointAim, including on pointerdown: preserving
   // the exact aim direction is more important than responding to hover.
@@ -1037,6 +1056,14 @@ for (const x of [-4.75, 4.75]) {
   }
 }
 const projectedCorner = new THREE.Vector3();
+function changePrecisionZoom(steps) {
+  if (!precisionZoom || camera !== topCamera) return;
+  const next = adjustPrecisionZoom(precisionZoomLevel, steps);
+  if (next === precisionZoomLevel) return;
+  precisionZoomLevel = next;
+  syncTopFraming();
+  lensPositionDirty = true;
+}
 function movePrecisionCamera(dxWorld, dzWorld) {
   if (!precisionZoom || camera !== topCamera) return;
   precisionAnchor = panPrecisionFocus(precisionAnchor, dxWorld, dzWorld,
@@ -1046,20 +1073,24 @@ function movePrecisionCamera(dxWorld, dzWorld) {
 }
 function syncTopFraming() {
   const focus = precisionZoom ? precisionAnchor : { x: 0, z: 0 };
-  topCamera.zoom = precisionZoom ? PRECISION_ZOOM : 1;
+  topCamera.zoom = precisionZoom ? precisionZoomLevel : 1;
   topCamera.position.set(focus.x, 20, focus.z);
   topCamera.lookAt(focus.x, 0, focus.z);
   topCamera.updateProjectionMatrix();
   topCamera.updateMatrixWorld();
   viewport.dataset.zoom = precisionZoom ? 'precision' : 'full';
+  viewport.dataset.zoomFactor = topCamera.zoom.toFixed(1);
   viewport.dataset.cameraFocusX = precisionZoom ? focus.x.toFixed(3) : '0.000';
   viewport.dataset.cameraFocusZ = precisionZoom ? focus.z.toFixed(3) : '0.000';
   precisionZoomButton.setAttribute('aria-pressed', String(precisionZoom));
-  precisionZoomButton.textContent = precisionZoom ? 'Ver mesa' : 'Zoom ×1,4';
+  precisionZoomButton.textContent = precisionZoom
+    ? precisionZoomLevel.toFixed(1).replace('.', ',') + '× · Salir' : 'Zoom ×1,4';
   precisionZoomButton.setAttribute('aria-label', precisionZoom
-    ? 'Restaurar vista completa de la mesa' : 'Acercar la mesa 1,4 veces en vista cenital');
+    ? 'Zoom ' + precisionZoomLevel.toFixed(1).replace('.', ',') +
+      ' veces. Pulsa para restaurar la mesa completa'
+    : 'Acercar la mesa 1,4 veces en vista cenital');
   precisionZoomButton.title = precisionZoom
-    ? 'Arrastra con botón derecho o Mayús + ratón · Mayús + flechas para mover · pulsa para ver la mesa'
+    ? 'Rueda o +/−: zoom 1,2×–2,2× · botón derecho/Mayús + arrastrar: mover · pulsa para ver la mesa'
     : 'Ampliar la puntería sin alterar el tiro';
 }
 function resize() {

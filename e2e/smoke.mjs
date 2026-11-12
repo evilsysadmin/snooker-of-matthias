@@ -560,6 +560,37 @@ try {
     (2.05 + 0.175) * (wideTableWidth / 9.5) * PRECISION_ZOOM;
   await widePage.mouse.move(closeRackX, rackY);
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
+  const targetBeforeWheel = await widePage.locator('#viewport').getAttribute('data-aim-target');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom-factor'), '1.4');
+  await widePage.mouse.wheel(0, -240); // exactly two optical +0.1 steps
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.zoomFactor === '1.6');
+  assert.match(await zoom.innerText(), /1,6/);
+  assert.equal(await widePage.locator('#shots').innerText(), '00');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-target'),
+    targetBeforeWheel, 'wheel never alters intended first contact');
+  // Real raycasting uses the new camera zoom, not the previous screen scale.
+  const closeRackAt16 = wideLayout.windowWidth / 2 +
+    (2.05 + 0.175) * (wideTableWidth / 9.5) * 1.6;
+  await widePage.mouse.move(closeRackAt16, rackY);
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
+  await widePage.mouse.wheel(0, 240);
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.zoomFactor === '1.4');
+  await widePage.mouse.move(closeRackX, rackY);
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
+  await widePage.evaluate(() => document.activeElement?.blur());
+  await widePage.keyboard.press('Equal');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom-factor'), '1.5');
+  await widePage.keyboard.press('Minus');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom-factor'), '1.4');
+  // Large touchpad deltas clamp at 2.2x / 1.2x rather than zooming to infinity.
+  await widePage.mouse.wheel(0, -2400);
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom-factor'), '2.2');
+  await widePage.mouse.wheel(0, 2400);
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom-factor'), '1.2');
+  await widePage.mouse.wheel(0, -240);
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom-factor'), '1.4');
+  await widePage.mouse.move(closeRackX, rackY);
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
   const zoomPng = await widePage.screenshot({
     path: 'artifacts/snooker-wide-precision-top.png',
     fullPage: true, animations: 'disabled',
