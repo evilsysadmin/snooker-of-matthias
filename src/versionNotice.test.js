@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createVersionWatcher, readDeployedRelease, trustedRelease } from './versionNotice.js';
+import { canShowUpdateNotice, createVersionWatcher, readDeployedRelease, trustedRelease } from './versionNotice.js';
 
 const A = 'a'.repeat(40);
 const B = 'b'.repeat(40);
@@ -9,6 +9,17 @@ const valid = (sha) => ({
   schema: 1, application: 'snooker-of-matthias', environment: 'staging',
   authentication: { provider: 'shadowops-id', audience: 'snooker', required: true },
   source_sha: sha,
+});
+
+test('update banner waits for a fully idle cue, not just stationary balls', () => {
+  const resting = { moving: false, charging: false, pointerStroke: false, strokeAnimation: false };
+  assert.equal(canShowUpdateNotice(resting), true);
+  for (const active of ['moving', 'charging', 'pointerStroke', 'strokeAnimation']) {
+    assert.equal(canShowUpdateNotice({ ...resting, [active]: true }), false,
+      active + ' must defer an update until the complete stroke finishes');
+  }
+  assert.equal(canShowUpdateNotice({ ...resting, charging: true, pointerStroke: true }), false);
+  assert.equal(canShowUpdateNotice(resting), true, 'cancelled stroke may reveal the waiting notice');
 });
 
 test('only audited app and isolated Identity metadata can set a version', () => {

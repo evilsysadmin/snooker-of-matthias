@@ -2,6 +2,14 @@
 // No changes to the Identity edge, no secret storage and no forced reloads.
 const SHA = /^[a-f0-9]{40}$/;
 
+// A release prompt is secondary to the player's active stroke. The balls
+// stopping is not enough: the cue may still be charging, being dragged, or
+// completing its contact/recoil animation. This is presentation-only;
+// no physics, input controls or authenticated release contract changes.
+export function canShowUpdateNotice({ moving, charging, pointerStroke, strokeAnimation }) {
+  return !moving && !charging && !pointerStroke && !strokeAnimation;
+}
+
 export function trustedRelease(value) {
   return Boolean(value && typeof value === 'object' &&
     value.schema === 1 &&

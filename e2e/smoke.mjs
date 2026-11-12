@@ -295,10 +295,39 @@ try {
     assert.match(await page.locator('.table-label').innerText(), /POOL 8-BALL/);
     assert.equal(await page.locator('#update-banner').isHidden(), true,
       'no spurious banner for the current build');
-    // A changed deployed source SHA is signalled without automatically reloading.
+    // A changed deployed SHA must not disturb a held SPACE charge. This is
+    // exercised in real Chromium, not just the pure update eligibility test.
+    if (!config.isMobile) {
+      await page.evaluate(() => document.activeElement?.blur());
+      await page.keyboard.down('Space');
+      await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.cueCharge === 'active');
+    }
     publishedSha = 'b'.repeat(40);
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    if (!config.isMobile) {
+      await page.waitForTimeout(180);
+      assert.equal(await page.locator('#update-banner').isHidden(), true,
+        'a held keyboard charge must not be covered by the version banner');
+      assert.equal(await page.locator('#shots').innerText(), '00',
+        'new release must not fire or discard a held stroke');
+      // A window blur cancels the charge; a synthetic blur keeps this CI
+      // test deterministic and must not cause a shot.
+      await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+      await page.keyboard.up('Space');
+    }
     await page.locator('#update-banner').waitFor({ state: 'visible' });
+    if (!config.isMobile) {
+      // An already-visible reminder must also yield to a *new* stroke.
+      await page.evaluate(() => document.activeElement?.blur());
+      await page.keyboard.down('Space');
+      await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.cueCharge === 'active');
+      assert.equal(await page.locator('#update-banner').isHidden(), true,
+        'active cue input takes priority over an already-visible update');
+      await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+      await page.keyboard.up('Space');
+      await page.locator('#update-banner').waitFor({ state: 'visible' });
+      assert.equal(await page.locator('#shots').innerText(), '00');
+    }
     assert.match(await page.locator('#update-banner').innerText(), /Nueva versión disponible/);
     assert.match(await page.locator('#update-banner').innerText(), /reinicia la mesa actual/);
     assert.equal(await page.locator('#shots').innerText(), '00',
