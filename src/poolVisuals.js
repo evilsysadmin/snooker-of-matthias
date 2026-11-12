@@ -62,6 +62,8 @@ export function keepCueWithinPrecisionView(focus, cue, viewHalfX, viewHalfZ,
       viewHalfX <= 0 || viewHalfZ <= 0) return focus;
   const safeX = viewHalfX * PRECISION_CUE_SAFE_FRACTION;
   const safeZ = viewHalfZ * PRECISION_CUE_SAFE_FRACTION;
+  if (Math.abs(cue.x - focus.x) <= safeX &&
+      Math.abs(cue.z - focus.z) <= safeZ) return focus;
   const dx = Math.max(-safeX, Math.min(safeX, cue.x - focus.x));
   const dz = Math.max(-safeZ, Math.min(safeZ, cue.z - focus.z));
   return panPrecisionFocus(focus,
