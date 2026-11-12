@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { chromium } from '@playwright/test';
-import { samplePngRGB, screenshotShowsFelt } from './pngFeltProbe.mjs';
+import { samplePngRGB, screenshotShowsFelt, readPngRgbRect } from './pngFeltProbe.mjs';
 import { TOP_CAMERA_FILL, PRECISION_ZOOM } from '../src/poolVisuals.js';
 
 mkdirSync('artifacts', { recursive: true });
@@ -679,12 +679,57 @@ try {
   await zoom.click();
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.precisionTarget === '1');
   assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom-factor'), '1.4');
+  // Pixel-level golden-state contract: both the ivory white and the real
+  // amber target halo must be visible in the rendered Chromium PNG.
+  const aimedPng = await widePage.screenshot({
+    path: 'artifacts/snooker-wide-precision-target-halo.png',
+    fullPage: true, animations: 'disabled',
+  });
+  const cueStart = {
+    x: Math.round(wideLayout.windowWidth / 2 +
+      (-2.4 + 0.175) * (wideTableWidth / 9.5) * PRECISION_ZOOM),
+    y: Math.round(rackY),
+  };
+  const patchAt = (buffer, x, y, radius) => readPngRgbRect(buffer, {
+    x: Math.round(x - radius), y: Math.round(y - radius),
+    width: radius * 2 + 1, height: radius * 2 + 1,
+  });
+  const countIvory = (pixels) => {
+    let n = 0;
+    for (let i = 0; i < pixels.length; i += 3) {
+      if (pixels[i] > 140 && pixels[i + 1] > 137 && pixels[i + 2] > 120 &&
+          Math.abs(pixels[i] - pixels[i + 1]) < 85) n++;
+    }
+    return n;
+  };
+  const staticIvory = countIvory(patchAt(aimedPng, cueStart.x, cueStart.y, 18));
+  assert.ok(staticIvory >= 70,
+    'real 3D cue ball must have a legible ivory silhouette in the zoom screenshot: ' + staticIvory);
+  const targetX = Math.round(wideLayout.windowWidth / 2 +
+    (2.05 + 0.175) * (wideTableWidth / 9.5) * PRECISION_ZOOM);
+  const haloBand = { x: targetX - 18, y: Math.round(rackY) - 34,
+    width: 37, height: 20 };
+  const haloOn = readPngRgbRect(aimedPng, haloBand);
   // Aim diagonally into clear cloth, avoiding the rack: the white travels far
   // enough to exercise a substantial actual camera follow.
   const wideScale = wideTableWidth / 9.5 * PRECISION_ZOOM;
   await widePage.mouse.move(wideLayout.windowWidth / 2 +
     (-1.0 - (-0.175)) * wideScale, rackY + 1.1 * wideScale);
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.precisionTarget === '');
+  const noHaloPng = await widePage.screenshot({
+    path: 'artifacts/snooker-wide-precision-no-target-halo.png',
+    fullPage: true, animations: 'disabled',
+  });
+  const haloOff = readPngRgbRect(noHaloPng, haloBand);
+  let distinctAmber = 0;
+  for (let i = 0; i < haloOn.length; i += 3) {
+    if (haloOn[i] - haloOff[i] > 35 &&
+        haloOn[i] > haloOn[i + 2] * 1.27 &&
+        haloOn[i + 1] > haloOn[i + 2] * 1.08) distinctAmber++;
+  }
+  assert.ok(distinctAmber >= 9,
+    'the target halo must produce visible amber pixels (not just a visible mesh): ' +
+      distinctAmber);
   const followX0 = Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-x'));
   const followZ0 = Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-z'));
   await widePage.locator('#power').evaluate((el) => {
@@ -707,6 +752,20 @@ try {
   });
   assert.ok(screenshotShowsFelt(followPng, wideLayout.viewport),
     'the tracked physical shot must keep real WebGL cloth visible');
+  // The projected marker is computed from the real cue mesh, but passing CI
+  // requires actual bright pixels in its screenshot vicinity. A stale flag,
+  // invisible 3D mesh or lost framebuffer cannot satisfy this check.
+  const cueScreen = await widePage.locator('#viewport').evaluate((el) => ({
+    x: Number(el.dataset.cueScreenX), y: Number(el.dataset.cueScreenY),
+    visible: Boolean(el.dataset.cueScreenX && el.dataset.cueScreenY),
+  }));
+  assert.ok(cueScreen.visible && cueScreen.x > 0 && cueScreen.y > 0,
+    'live cue must still project onto the real playing canvas');
+  const movingIvory = countIvory(patchAt(followPng, cueScreen.x, cueScreen.y, 38));
+  assert.ok(movingIvory >= 65,
+    'tracked moving cue must remain legible in real screenshot pixels: ' + movingIvory);
+  console.log('SNOOKER_VISUAL_CUE_HALO_PASS',
+    { ivory: staticIvory, amber: distinctAmber, movingIvory });
   await widePage.locator('#restart').click();
   assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'full');
   assert.equal(await widePage.locator('#viewport').getAttribute('data-precision-target'), '');

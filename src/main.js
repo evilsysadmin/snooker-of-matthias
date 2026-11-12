@@ -513,6 +513,9 @@ precisionTargetHalo.renderOrder = 4;
 precisionTargetHalo.visible = false;
 scene.add(precisionTargetHalo);
 const cueDirection = new THREE.Vector3(1, 0, 0);
+// Report the actual projected cue-mesh centre to screenshot-based QA. The
+// browser reads only visible world coordinates; physical motion is unchanged.
+const projectedCueScreen = new THREE.Vector3();
 const reducedCueMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 let balls = createRack();
@@ -1376,6 +1379,17 @@ function frame(now) {
   viewport.dataset.cueLocator = models.get(0).userData.cueRing.visible ? 'ready' : '';
   updateCue(now);
   animatePocketPulses(now);
+  if (precisionZoom && camera === topCamera && models.get(0).visible) {
+    const rect = canvas.getBoundingClientRect();
+    projectedCueScreen.copy(models.get(0).position).project(topCamera);
+    viewport.dataset.cueScreenX = String(Math.round(rect.left +
+      (projectedCueScreen.x + 1) * rect.width / 2));
+    viewport.dataset.cueScreenY = String(Math.round(rect.top +
+      (1 - projectedCueScreen.y) * rect.height / 2));
+  } else {
+    delete viewport.dataset.cueScreenX;
+    delete viewport.dataset.cueScreenY;
+  }
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
