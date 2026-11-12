@@ -2,7 +2,10 @@ import { inflateSync } from 'node:zlib';
 
 // Decode the Chromium PNG screenshot itself, not canvas dimensions or DOM
 // presence: a lost WebGL canvas can leave the entire table invisible.
-export function samplePngRGB(png, x, y) {
+// Read a rectangular patch from one real Chromium PNG screenshot, inflating
+// and unfiltering it only once. Used for visual pixel assertions rather than
+// trusting DOM visibility flags or WebGL mesh state alone.
+export function readPngRgbRect(png, rect) {
   if (png.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a')
     throw new Error('Browser screenshot is not a PNG');
   let width, height, depth, type;
@@ -21,19 +24,22 @@ export function samplePngRGB(png, x, y) {
     pos = start + length + 4;
     if (tag === 'IEND') break;
   }
+  const { x, y, width: patchWidth, height: patchHeight } = rect;
   if (depth !== 8 || (type !== 2 && type !== 6) ||
-      !Number.isInteger(x) || !Number.isInteger(y) ||
-      x < 0 || y < 0 || x >= width || y >= height)
+      ![x, y, patchWidth, patchHeight].every(Number.isInteger) ||
+      x < 0 || y < 0 || patchWidth <= 0 || patchHeight <= 0 ||
+      x + patchWidth > width || y + patchHeight > height)
     throw new Error('Unsupported PNG format or sample position');
   const channels = type === 2 ? 3 : 4;
   const bytesPerRow = width * channels;
-  const data = inflateSync(Buffer.concat(payload));
-  if (data.length < (bytesPerRow + 1) * height) throw new Error('Truncated PNG pixels');
+  const raw = inflateSync(Buffer.concat(payload));
+  if (raw.length < (bytesPerRow + 1) * height) throw new Error('Truncated PNG pixels');
+  const pixels = new Uint8Array(patchWidth * patchHeight * 3);
   let previous = new Uint8Array(bytesPerRow);
   let current = new Uint8Array(bytesPerRow);
-  for (let row = 0; row <= y; row++) {
+  for (let row = 0; row < y + patchHeight; row++) {
     const offset = row * (bytesPerRow + 1);
-    const filter = data[offset];
+    const filter = raw[offset];
     for (let i = 0; i < bytesPerRow; i++) {
       const left = i < channels ? 0 : current[i - channels];
       const up = previous[i];
@@ -47,12 +53,25 @@ export function samplePngRGB(png, x, y) {
         const a = Math.abs(p - left), b = Math.abs(p - up), c = Math.abs(p - upperLeft);
         predictor = a <= b && a <= c ? left : b <= c ? up : upperLeft;
       } else if (filter !== 0) throw new Error('Unsupported PNG scanline filter');
-      current[i] = (data[offset + 1 + i] + predictor) & 255;
+      current[i] = (raw[offset + 1 + i] + predictor) & 255;
     }
-    if (row !== y) [previous, current] = [current, previous];
+    if (row >= y) {
+      const destStart = (row - y) * patchWidth * 3;
+      for (let column = 0; column < patchWidth; column++) {
+        const source = (x + column) * channels;
+        const dest = destStart + column * 3;
+        pixels[dest] = current[source];
+        pixels[dest + 1] = current[source + 1];
+        pixels[dest + 2] = current[source + 2];
+      }
+    }
+    [previous, current] = [current, previous];
   }
-  const at = x * channels;
-  return [...current.subarray(at, at + 3)];
+  return pixels;
+}
+
+export function samplePngRGB(png, x, y) {
+  return [...readPngRgbRect(png, { x, y, width: 1, height: 1 })];
 }
 
 export function screenshotShowsFelt(png, rect) {
