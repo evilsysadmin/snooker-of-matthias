@@ -208,28 +208,28 @@ try {
     const tableRect = await page.locator('#viewport').boundingBox();
     assert.ok(screenshotShowsFelt(topPng, tableRect),
       config.name + ' top camera must paint real green felt, not an empty WebGL canvas');
-    // Validate actual WebGL pixels of the new cue spot in the *top-down*
-    // screenshot. A mocked canvas/DOM-only marker cannot satisfy this.
-    // Uses the same orthographic projection as the rack/jaw aim smoke.
-    if (!config.isMobile) {
-      const cueCenter = await page.locator('#viewport canvas').evaluate((canvas) => {
-        const rect = canvas.getBoundingClientRect();
-        const aspect = rect.width / rect.height;
-        const portrait = rect.width <= 700 && rect.height > rect.width * 1.15;
-        const hw = portrait ? 2.51 : 4.75;
-        const hh = portrait ? 4.75 : 2.51;
-        const halfHeight = Math.max(hh / 0.89, hw / (aspect * 0.89));
-        const scale = rect.height / (2 * halfHeight);
-        return portrait
-          ? { x: rect.left + rect.width / 2,
-              y: rect.top + rect.height / 2 + 2.4 * scale }
-          : { x: rect.left + rect.width / 2 - 2.4 * scale,
-              y: rect.top + rect.height / 2 };
-      });
-      const pixel = samplePngRGB(topPng, Math.round(cueCenter.x), Math.round(cueCenter.y));
-      assert.ok(pixel[0] < 155 && pixel[2] > pixel[0] * 1.18,
-        'cue top spot must render distinctly dark/blue-green against ivory: ' + pixel);
-    }
+    // The cue is much smaller in portrait. Verify its dark marker in actual
+    // WebGL screenshot pixels on BOTH desktop and a 390px touch viewport.
+    // DOM/CSS-only embellishments cannot satisfy this visual contract.
+    const cueCenter = await page.locator('#viewport canvas').evaluate((canvas) => {
+      const rect = canvas.getBoundingClientRect();
+      const aspect = rect.width / rect.height;
+      const portrait = rect.width <= 700 && rect.height > rect.width * 1.15;
+      const hw = portrait ? 2.51 : 4.75;
+      const hh = portrait ? 4.75 : 2.51;
+      const halfHeight = Math.max(hh / 0.89, hw / (aspect * 0.89));
+      const scale = rect.height / (2 * halfHeight);
+      return portrait
+        ? { x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2 + 2.4 * scale }
+        : { x: rect.left + rect.width / 2 - 2.4 * scale,
+            y: rect.top + rect.height / 2 };
+    });
+    const cuePixel = samplePngRGB(topPng, Math.round(cueCenter.x), Math.round(cueCenter.y));
+    assert.ok(cuePixel[0] < 155 && cuePixel[2] > cuePixel[0] * 1.18,
+      config.name + ' cue spot must contrast against ivory even at phone scale: ' + cuePixel);
+    assert.equal(await page.locator('#viewport').getAttribute('data-cue-locator'), 'ready',
+      'only the actual playable cue should have its selection marker visible');
 
     await page.locator('#camera-3d').click();
     assert.equal(await page.locator('#viewport').getAttribute('data-camera'), '3d');
@@ -251,6 +251,8 @@ try {
     if (config.isMobile) await page.locator('#strike').tap();
     else await page.locator('#strike').click();
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.cueLocator === '',
+      undefined, { timeout: 5000 });
     await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '',
       undefined, { timeout: 5000 });
     assert.equal(await lens.isVisible(), false, 'contact lens hides during a real shot');
@@ -262,6 +264,7 @@ try {
     await page.locator('#camera-top').click();
     await page.locator('#restart').click();
     await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.cueLocator === 'ready');
     assert.equal(await spinControl.getAttribute('data-spin'), '0', 'restart resets spin');
     // The stroke button accepts a deliberate hold on both desktop and mobile.
     const strikeBounds = await page.locator('#strike').boundingBox();
