@@ -13,6 +13,16 @@ export const BALL_COLORS = Object.freeze([
 // laptops. Keep a 3.5% safety margin on the limiting axis so rails/pockets
 // and cue-ball selection visuals remain completely in frame.
 export const TOP_CAMERA_FILL = 0.965;
+// Optical-only precision aid: ball physics and pocket sizes are unchanged.
+export const PRECISION_ZOOM = 1.4;
+// Keep both the white and the predicted first-contact ball on screen.
+export function precisionFocus(cue, target) {
+  if (!cue || !Number.isFinite(cue.x) || !Number.isFinite(cue.z)) return { x: 0, z: 0 };
+  if (!target || !Number.isFinite(target.x) || !Number.isFinite(target.z)) {
+    return { x: cue.x, z: cue.z };
+  }
+  return { x: (cue.x + target.x) / 2, z: (cue.z + target.z) / 2 };
+}
 export const CUE_BALL_MARKER = Object.freeze({
   spotColor: 0x1a4555, ringColor: 0xfbe0a2, rimColor: 0x0c3028,
   spotRadiusScale: 0.34, ringRadiusScale: 1.48,

@@ -562,3 +562,19 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   .spin-cycle { min-height: 52px; padding: 3px 6px; }
   .spin-disc { width: 25px; height: 25px; flex-basis: 25px; }
 }
+
+/* Progressive disclosure: only very wide screens have a gutter for an
+   optional close-up without hiding any pocket behind camera buttons. */
+.precision-zoom { display: none; }
+@media (min-width: 1700px) and (min-height: 740px) {
+  .precision-zoom {
+    display: block;
+    min-width: 106px;
+    color: #e6d2ac;
+    border-left: 1px solid #c4ab7755;
+  }
+  .precision-zoom[aria-pressed="true"] {
+    background: #345447;
+    color: #fff0c5;
+  }
+}
