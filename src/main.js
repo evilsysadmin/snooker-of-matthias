@@ -674,7 +674,9 @@ function formatScore() {
     ' <small>· ' + remainingObjectBalls(balls) + ' en mesa</small>';
 }
 function restart() {
-  // New rack and mode changes never inherit an old cropped view.
+  // A new rack restores both full-table framing and the initial 1.4x
+  // precision scale. Without this the view silently reopened at an old 2.2x.
+  precisionZoomLevel = PRECISION_ZOOM;
   if (precisionZoom) {
     precisionZoom = false;
     syncTopFraming();
