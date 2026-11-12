@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BALL_COLORS, CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, precisionFocus, STRIPE_IVORY, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS, poolBallSpec,
+  BALL_COLORS, CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, precisionFocus, panPrecisionFocus, STRIPE_IVORY, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS, poolBallSpec,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
 } from './poolVisuals.js';
 
@@ -36,6 +36,18 @@ test('precision zoom focuses the real cue-to-target segment, leaving physics unt
   assert.deepEqual(precisionFocus(null, null), { x: 0, z: 0 });
   assert.ok(PRECISION_ZOOM * TOP_CAMERA_FILL > 1,
     'the close-up is opt-in; full table remains the default');
+});
+
+test('precision camera panning is bounded and leaves game coordinates untouched', () => {
+  const start = Object.freeze({ x: -0.175, z: 0 });
+  assert.deepEqual(panPrecisionFocus(start, -0.65, -0.42, 4.35, 2.15),
+    { x: -0.825, z: -0.42 });
+  assert.deepEqual(start, { x: -0.175, z: 0 },
+    'panning must not mutate the stored anchor or the ball positions');
+  assert.deepEqual(panPrecisionFocus(start, -100, 100, 4.35, 2.15),
+    { x: -4.35, z: 2.15 });
+  assert.deepEqual(panPrecisionFocus({ x: 4.35, z: -2.15 }, 1, -1, 4.35, 2.15),
+    { x: 4.35, z: -2.15 });
 });
 
 test('the cue has a visible unique marker, unchanged physics size and muted stripe white', () => {

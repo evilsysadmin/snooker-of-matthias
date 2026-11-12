@@ -578,3 +578,7 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
     color: #fff0c5;
   }
 }
+
+/* Precision panning only changes camera orientation/position. Default mouse
+   motion still aims; the drag gesture switches to a grabbing cursor. */
+#viewport[data-panning="active"] canvas { cursor: grabbing; }

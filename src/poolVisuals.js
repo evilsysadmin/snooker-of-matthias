@@ -15,6 +15,15 @@ export const BALL_COLORS = Object.freeze([
 export const TOP_CAMERA_FILL = 0.965;
 // Optical-only precision aid: ball physics and pocket sizes are unchanged.
 export const PRECISION_ZOOM = 1.4;
+// Camera movement only; coordinates are table units and never enter physics.
+// Clamp the visual target so a long gesture cannot lose the table completely.
+export function panPrecisionFocus(anchor, deltaX, deltaZ, limitX, limitZ) {
+  const clamp = (value, limit) => Math.max(-limit, Math.min(limit, value));
+  return {
+    x: clamp(anchor.x + deltaX, limitX),
+    z: clamp(anchor.z + deltaZ, limitZ),
+  };
+}
 // Keep both the white and the predicted first-contact ball on screen.
 export function precisionFocus(cue, target) {
   if (!cue || !Number.isFinite(cue.x) || !Number.isFinite(cue.z)) return { x: 0, z: 0 };
