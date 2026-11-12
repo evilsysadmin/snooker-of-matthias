@@ -50,6 +50,25 @@ export function panPrecisionFocus(anchor, deltaX, deltaZ, limitX, limitZ) {
     z: clamp(anchor.z + deltaZ, limitZ),
   };
 }
+// A cue moving at rail speed can outrun the gentle cue/target midpoint
+// follower. Only then shift the optical centre enough to bring the *actual*
+// white back into the inner 68% of the visible frustum, retaining space for
+// the next cushion bounce. This must never modify ball coordinates or zoom.
+export const PRECISION_CUE_SAFE_FRACTION = 0.68;
+export function keepCueWithinPrecisionView(focus, cue, viewHalfX, viewHalfZ,
+    limitX, limitZ) {
+  if (!cue || cue.pocketed || !Number.isFinite(cue.x) || !Number.isFinite(cue.z) ||
+      !Number.isFinite(viewHalfX) || !Number.isFinite(viewHalfZ) ||
+      viewHalfX <= 0 || viewHalfZ <= 0) return focus;
+  const safeX = viewHalfX * PRECISION_CUE_SAFE_FRACTION;
+  const safeZ = viewHalfZ * PRECISION_CUE_SAFE_FRACTION;
+  if (Math.abs(cue.x - focus.x) <= safeX &&
+      Math.abs(cue.z - focus.z) <= safeZ) return focus;
+  const dx = Math.max(-safeX, Math.min(safeX, cue.x - focus.x));
+  const dz = Math.max(-safeZ, Math.min(safeZ, cue.z - focus.z));
+  return panPrecisionFocus(focus,
+    cue.x - focus.x - dx, cue.z - focus.z - dz, limitX, limitZ);
+}
 // Keep both the white and the predicted first-contact ball on screen.
 export function precisionFocus(cue, target) {
   if (!cue || !Number.isFinite(cue.x) || !Number.isFinite(cue.z)) return { x: 0, z: 0 };

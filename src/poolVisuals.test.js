@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BALL_COLORS, CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, MIN_PRECISION_ZOOM, MAX_PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus, zoomPrecisionFocusAtPoint, followPrecisionFocus, STRIPE_IVORY, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS, poolBallSpec,
+  BALL_COLORS, CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, MIN_PRECISION_ZOOM, MAX_PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus, zoomPrecisionFocusAtPoint, followPrecisionFocus, keepCueWithinPrecisionView, PRECISION_CUE_SAFE_FRACTION, STRIPE_IVORY, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS, poolBallSpec,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
 } from './poolVisuals.js';
 
@@ -83,6 +83,34 @@ test('precision camera panning is bounded and leaves game coordinates untouched'
     { x: -4.35, z: 2.15 });
   assert.deepEqual(panPrecisionFocus({ x: 4.35, z: -2.15 }, 1, -1, 4.35, 2.15),
     { x: 4.35, z: -2.15 });
+});
+
+test('rail-speed cue cannot leave the inner precision camera safe area', () => {
+  const start = Object.freeze({ x: -0.175, z: 0 });
+  const cue = Object.freeze({ x: 3.6, z: 1.95 });
+  const safeX = 2.4 * PRECISION_CUE_SAFE_FRACTION;
+  const safeZ = 0.95 * PRECISION_CUE_SAFE_FRACTION;
+  const next = keepCueWithinPrecisionView(start, cue, 2.4, 0.95, 4.35, 2.15);
+  assert.ok(Math.abs(cue.x - next.x) <= safeX + 1e-10);
+  assert.ok(Math.abs(cue.z - next.z) <= safeZ + 1e-10);
+  assert.ok(Math.abs(next.x - (cue.x - safeX)) < 1e-10);
+  assert.ok(Math.abs(next.z - (cue.z - safeZ)) < 1e-10);
+  assert.deepEqual(start, { x: -0.175, z: 0 }, 'camera changes do not mutate prior anchor');
+  assert.deepEqual(cue, { x: 3.6, z: 1.95 }, 'no physics changes');
+  assert.equal(keepCueWithinPrecisionView(start, { x: 0.5, z: 0.4 }, 2.4, 0.95,
+    4.35, 2.15), start, 'inside dead zone: same anchor, no visual jitter');
+  assert.deepEqual(keepCueWithinPrecisionView({ x: 3.9, z: 1.8 },
+    { x: -100, z: -100 }, 0.3, 0.3, 4.35, 2.15), { x: -4.35, z: -2.15 },
+  'bounded extreme correction cannot pan outside the real tabletop');
+  assert.equal(keepCueWithinPrecisionView(start, { ...cue, pocketed: true }, 2.4, 0.95,
+    4.35, 2.15), start, 'scratch never tracks an invisible ball');
+  assert.equal(keepCueWithinPrecisionView(start, cue, NaN, 0.95, 4.35, 2.15),
+    start, 'invalid viewport cannot mutate framing');
+  const railCue = { x: 4.25, z: 2.03 };
+  const railFocus = keepCueWithinPrecisionView({ x: 0, z: 0 },
+    railCue, 2.4, 0.95, 4.35, 2.15);
+  assert.ok(Math.abs(railCue.x - railFocus.x) <= safeX);
+  assert.ok(Math.abs(railCue.z - railFocus.z) <= safeZ);
 });
 
 test('precision shot tracking eases toward live cue and first-contact target only', () => {

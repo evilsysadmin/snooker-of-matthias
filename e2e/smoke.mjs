@@ -741,6 +741,66 @@ try {
   // Real active-shot camera tracking: a new practice rack with a first-hit
   // prediction illuminates the actual target ball only in precision view.
   await widePage.locator('#mode-practice').click();
+  // A high-speed rail rebound at maximum optical zoom: if the camera merely
+  // eases toward the initial first-contact midpoint, the real cue slips out
+  // of view for multiple physics frames. Keep it in the inner safe zone.
+  const railX = wideLayout.windowWidth / 2 - 2.4 * wideTableWidth / 9.5;
+  const railAimY = rackY + 1.5 * wideTableWidth / 9.5;
+  await widePage.mouse.move(railX, railAimY);
+  await zoom.click();
+  await widePage.evaluate(() => document.activeElement?.blur());
+  for (let step = 0; step < 8; step++) await widePage.keyboard.press('Equal');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom-factor'), '2.2');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-camera-focus-x'), '-2.400');
+  await widePage.locator('#power').evaluate((el) => {
+    el.value = '100';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await widePage.locator('#strike').click();
+  await widePage.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
+  const railSafety = await widePage.evaluate(async () => {
+    const view = document.querySelector('#viewport');
+    const box = view.getBoundingClientRect();
+    const centreY = (box.top + box.bottom) / 2;
+    const halfPixels = box.height / 2;
+    let maxDistance = 0, maxWorldZ = 0, samples = 0, outside = 0;
+    const start = performance.now();
+    await new Promise((resolve) => {
+      const sample = () => {
+        if (view.dataset.cueScreenY) {
+          const centreZ = Number(view.dataset.cameraFocusZ);
+          const screenY = Number(view.dataset.cueScreenY);
+          const fraction = Math.abs(screenY - centreY) / halfPixels;
+          maxDistance = Math.max(maxDistance, fraction);
+          // The camera projection is linear in top-down view. Reconstruct
+          // actual cue z from its real mesh projection and optical scale.
+          const halfWorld = 2.51 / 0.965;
+          const zoom = Number(view.dataset.zoomFactor);
+          const worldZ = centreZ + (screenY - centreY) *
+            (halfWorld / zoom) / halfPixels;
+          maxWorldZ = Math.max(maxWorldZ, worldZ);
+          samples++;
+          if (fraction > 0.76) outside++;
+        }
+        if (performance.now() - start > 2600) resolve();
+        else requestAnimationFrame(sample);
+      };
+      sample();
+    });
+    return { maxDistance, maxWorldZ, samples, outside };
+  });
+  assert.ok(railSafety.samples >= 3, 'real moving cue must render on several frames');
+  assert.ok(railSafety.maxWorldZ >= 1.50,
+    'actual physical white must travel toward the long rail: ' +
+      JSON.stringify(railSafety));
+  assert.equal(railSafety.outside, 0,
+    'rail-speed cue must stay within inner 76% of visible top-down viewport: ' +
+      JSON.stringify(railSafety));
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'precision');
+  await widePage.locator('#restart').click();
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'full');
+  // Restore original opening-rack target and default 1.4× close-up for
+  // the independent halo-vs-no-halo pixel regression below.
   await widePage.mouse.move(rackX, rackY);
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
   await zoom.click();

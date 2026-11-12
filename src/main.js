@@ -16,7 +16,7 @@ import { createFeedbackGate, createBilliardsAudio } from './shotFeedback.js';
 import { poolBallSpec, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
   CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus,
-  followPrecisionFocus, zoomPrecisionFocusAtPoint } from './poolVisuals.js';
+  followPrecisionFocus, zoomPrecisionFocusAtPoint, keepCueWithinPrecisionView } from './poolVisuals.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -674,7 +674,9 @@ function formatScore() {
     ' <small>· ' + remainingObjectBalls(balls) + ' en mesa</small>';
 }
 function restart() {
-  // New rack and mode changes never inherit an old cropped view.
+  // A new rack restores both full-table framing and the initial 1.4x
+  // precision scale. Without this the view silently reopened at an old 2.2x.
+  precisionZoomLevel = PRECISION_ZOOM;
   if (precisionZoom) {
     precisionZoom = false;
     syncTopFraming();
@@ -1367,7 +1369,14 @@ function frame(now) {
   if (precisionZoom && camera === topCamera && precisionFollowActive &&
       !precisionManualPan && !balls[0].pocketed && !panPointer) {
     const target = balls.find((ball) => ball.id === precisionFollowTargetId && !ball.pocketed);
-    const next = followPrecisionFocus(precisionAnchor, balls[0], target, elapsed,
+    const eased = followPrecisionFocus(precisionAnchor, balls[0], target, elapsed,
+      TABLE.halfX, TABLE.halfZ);
+    // The eased midpoint follows natural play; the dead-zone correction only
+    // runs when a fast shot heads for the rail and the white nears the edge.
+    // Frustum sizes come from the actual currently displayed optical camera.
+    const next = keepCueWithinPrecisionView(eased, balls[0],
+      (topCamera.right - topCamera.left) / (2 * topCamera.zoom),
+      (topCamera.top - topCamera.bottom) / (2 * topCamera.zoom),
       TABLE.halfX, TABLE.halfZ);
     const drift = Math.hypot(next.x - precisionAnchor.x, next.z - precisionAnchor.z);
     if (drift > 0.0001) {
