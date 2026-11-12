@@ -755,6 +755,13 @@ try {
   assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'precision');
   assert.equal(await widePage.locator('#viewport').getAttribute('data-precision-target'), '',
     'the aiming halo must disappear throughout an active rolling stroke');
+  // SwiftShader can spend substantial time encoding a full PNG while physics
+  // continues to move the cue. Stop scheduling *future* frames only after
+  // genuine tracking has happened; let the in-flight RAF paint once more.
+  // The frozen camera marker and the compositor screenshot then describe
+  // the same real WebGL frame, rather than two different ball positions.
+  await widePage.evaluate(() => { window.requestAnimationFrame = () => 0; });
+  await widePage.waitForTimeout(120);
   const followPng = await widePage.screenshot({
     path: 'artifacts/snooker-wide-precision-follow-shot.png',
     fullPage: true, animations: 'disabled',
