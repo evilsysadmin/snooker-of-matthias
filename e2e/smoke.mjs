@@ -707,8 +707,12 @@ try {
     'real 3D cue ball must have a legible ivory silhouette in the zoom screenshot: ' + staticIvory);
   const targetX = Math.round(wideLayout.windowWidth / 2 +
     (2.05 + 0.175) * (wideTableWidth / 9.5) * PRECISION_ZOOM);
-  const haloBand = { x: targetX - 18, y: Math.round(rackY) - 34,
-    width: 37, height: 20 };
+  // Inspect the actual annulus, not only its uppermost two-pixel edge.
+  // The illuminated ring is semi-transparent and its bright segments vary
+  // with physical felt shading and SwiftShader anti-aliasing.
+  const haloRadius = 38;
+  const haloBand = { x: targetX - haloRadius, y: Math.round(rackY) - haloRadius,
+    width: haloRadius * 2 + 1, height: haloRadius * 2 + 1 };
   const haloOn = readPngRgbRect(aimedPng, haloBand);
   // Aim diagonally into clear cloth, avoiding the rack: the white travels far
   // enough to exercise a substantial actual camera follow.
@@ -723,11 +727,16 @@ try {
   const haloOff = readPngRgbRect(noHaloPng, haloBand);
   let distinctAmber = 0;
   for (let i = 0; i < haloOn.length; i += 3) {
-    if (haloOn[i] - haloOff[i] > 35 &&
-        haloOn[i] > haloOn[i + 2] * 1.27 &&
-        haloOn[i + 1] > haloOn[i + 2] * 1.08) distinctAmber++;
+    const index = i / 3;
+    const dx = index % haloBand.width - haloRadius;
+    const dy = Math.floor(index / haloBand.width) - haloRadius;
+    const distance = Math.hypot(dx, dy);
+    if (distance < 21 || distance > 34) continue;
+    if (haloOn[i] - haloOff[i] > 30 &&
+        haloOn[i] > haloOn[i + 2] * 1.16 &&
+        haloOn[i + 1] > haloOn[i + 2] * 1.04) distinctAmber++;
   }
-  assert.ok(distinctAmber >= 9,
+  assert.ok(distinctAmber >= 50,
     'the target halo must produce visible amber pixels (not just a visible mesh): ' +
       distinctAmber);
   const followX0 = Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-x'));
