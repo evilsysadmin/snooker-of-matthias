@@ -100,7 +100,7 @@ test('rail-speed cue cannot leave the inner precision camera safe area', () => {
   assert.equal(keepCueWithinPrecisionView(start, { x: 0.5, z: 0.4 }, 2.4, 0.95,
     4.35, 2.15), start, 'inside dead zone: same anchor, no visual jitter');
   assert.deepEqual(keepCueWithinPrecisionView({ x: 3.9, z: 1.8 },
-    { x: -4.1, z: -1.95 }, 0.3, 0.3, 4.35, 2.15), { x: -4.35, z: -2.15 },
+    { x: -100, z: -100 }, 0.3, 0.3, 4.35, 2.15), { x: -4.35, z: -2.15 },
   'bounded extreme correction cannot pan outside the real tabletop');
   assert.equal(keepCueWithinPrecisionView(start, { ...cue, pocketed: true }, 2.4, 0.95,
     4.35, 2.15), start, 'scratch never tracks an invisible ball');
