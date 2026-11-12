@@ -78,6 +78,8 @@ try {
     if (config.isMobile) {
       assert.equal(await page.locator('#precision-zoom').isVisible(), false,
         'portrait phone keeps its uncluttered controls');
+      assert.equal(await page.locator('#precision-zoom-compact').isVisible(), false,
+        'portrait phone must not lose space to a desktop zoom shortcut');
       assert.ok(layout.switcher.bottom <= layout.viewport.top + 35,
         'mobile camera selector stays above the upper tabletop cushion');
     }
@@ -125,6 +127,28 @@ try {
     if (!config.isMobile) {
       assert.equal(await page.locator('#precision-zoom').isVisible(), false,
         'standard desktop keeps camera controls off its six-pocket tabletop');
+      const compactZoom = page.locator('#precision-zoom-compact');
+      assert.equal(await compactZoom.isVisible(), true,
+        '1440 desktop must expose precision zoom in the lower control rail');
+      assert.equal(await compactZoom.getAttribute('aria-pressed'), 'false');
+      const compactBounds = await compactZoom.boundingBox();
+      assert.ok(compactBounds.y >= layout.controls.top - 1 &&
+          compactBounds.y + compactBounds.height <= layout.controls.bottom + 1,
+        'compact zoom control must never cover the tabletop');
+      await compactZoom.click();
+      assert.equal(await page.locator('#viewport').getAttribute('data-zoom'), 'precision');
+      assert.equal(await compactZoom.getAttribute('aria-pressed'), 'true');
+      assert.match(await compactZoom.innerText(), /1,4/);
+      await page.evaluate(() => document.activeElement?.blur());
+      await page.keyboard.press('KeyZ');
+      assert.equal(await page.locator('#viewport').getAttribute('data-zoom'), 'full');
+      await page.keyboard.press('KeyZ');
+      assert.equal(await page.locator('#viewport').getAttribute('data-zoom'), 'precision');
+      await page.keyboard.press('KeyZ');
+      assert.equal(await page.locator('#viewport').getAttribute('data-zoom'), 'full');
+      assert.equal(await compactZoom.getAttribute('aria-pressed'), 'false');
+      assert.equal(await page.locator('#shots').innerText(), '00',
+        'camera shortcut and compact button must never strike');
       assert.equal(await page.locator('.fine-aim').isVisible(), true,
         'canonical wide desktop HUD shows precise aiming controls');
       // Unfocused arrow keys use the same deterministic 0.5-degree nudges.
@@ -501,6 +525,18 @@ try {
   const tableWidthPx = 9.5 * compact.viewport.height / (2 * compactHH);
   assert.ok(tableWidthPx / compact.gameWidth > 0.60,
     'short laptop table must fill >60% of browser width without zoom/cropping');
+  const laptopZoom = laptopPage.locator('#precision-zoom-compact');
+  assert.equal(await laptopZoom.isVisible(), true,
+    'short 1198×614 laptop must offer zoom off the playfield');
+  const shortBounds = await laptopZoom.boundingBox();
+  assert.ok(shortBounds.y >= compact.controls.top - 1 &&
+      shortBounds.y + shortBounds.height <= compact.controls.bottom + 1,
+    'short laptop zoom button stays inside bottom control rail');
+  await laptopZoom.click();
+  assert.equal(await laptopPage.locator('#viewport').getAttribute('data-zoom-factor'), '1.4');
+  await laptopZoom.click();
+  assert.equal(await laptopPage.locator('#viewport').getAttribute('data-zoom'), 'full');
+  assert.equal(await laptopPage.locator('#shots').innerText(), '00');
   const laptopPng = await laptopPage.screenshot({
     path: 'artifacts/snooker-compact-laptop-top.png',
     fullPage: true, animations: 'disabled',
@@ -551,6 +587,8 @@ try {
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
   const zoom = widePage.locator('#precision-zoom');
   assert.equal(await zoom.isVisible(), true, 'wide desktop offers optical precision');
+  assert.equal(await widePage.locator('#precision-zoom-compact').isVisible(), false,
+    'panorama must not repeat the zoom button in the lower rail');
   assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'full');
   await zoom.click();
   assert.equal(await zoom.getAttribute('aria-pressed'), 'true');

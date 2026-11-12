@@ -582,3 +582,34 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
 /* Precision panning only changes camera orientation/position. Default mouse
    motion still aims; the drag gesture switches to a grabbing cursor. */
 #viewport[data-panning="active"] canvas { cursor: grabbing; }
+
+/* Everyday laptops have little/no right-hand gutter for a third camera
+   button. Put the exact same optical zoom in the lower *control* rail,
+   away from pockets. The large panorama keeps its existing camera button. */
+.precision-zoom-compact { display: none; }
+@media (min-width: 1050px) {
+  .precision-zoom-compact {
+    display: grid;
+    place-items: center;
+    flex: 0 0 56px;
+    min-width: 56px;
+    min-height: 46px;
+    padding: 0 5px;
+    border: 1px solid #b9c59f66;
+    border-radius: 9px;
+    background: #2b4841;
+    color: #f3e2bf;
+    font: 800 11px/1 Manrope, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  .precision-zoom-compact[aria-pressed="true"] {
+    background: #e1c388;
+    color: #172c24;
+  }
+  .precision-zoom-compact:hover:not([aria-pressed="true"]) {
+    background: #34594e;
+  }
+}
+@media (min-width: 1700px) and (min-height: 740px) and (min-aspect-ratio: 13/6) {
+  .precision-zoom-compact { display: none; }
+}
