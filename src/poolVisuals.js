@@ -10,7 +10,10 @@ export const BALL_COLORS = Object.freeze([
 // marker and a fine felt-level cue-selection ring that disappears in motion.
 export const CUE_BALL_MARKER = Object.freeze({
   spotColor: 0x1a4555, ringColor: 0xfbe0a2, rimColor: 0x0c3028,
-  spotRadiusScale: 0.27, ringRadiusScale: 1.48,
+  spotRadiusScale: 0.34, ringRadiusScale: 1.48,
+  // Two small bracketing ticks make the cue locator legible in a portrait
+  // viewport where the physical sphere can render only 8-10 px across.
+  tickDistanceScale: 1.95, tickLengthScale: 0.48,
 });
 export const STRIPE_IVORY = '#dce1da';
 export const LONG_RAIL_SIGHTS = Object.freeze([-3.56, -2.52, -1.44, 1.44, 2.52, 3.56]);
