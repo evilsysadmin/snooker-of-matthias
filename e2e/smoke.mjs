@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { chromium } from '@playwright/test';
 import { samplePngRGB, screenshotShowsFelt } from './pngFeltProbe.mjs';
+import { TOP_CAMERA_FILL } from '../src/poolVisuals.js';
 
 mkdirSync('artifacts', { recursive: true });
 const browser = await chromium.launch({
@@ -79,6 +80,17 @@ try {
         'mobile camera selector stays above the upper tabletop cushion');
     }
     assert.ok(layout.pageWidth <= layout.windowWidth + 1, 'no horizontal scrolling');
+    const portrait = layout.viewport.width <= 700 &&
+      layout.viewport.height > layout.viewport.width * 1.15;
+    const aspect = layout.viewport.width / layout.viewport.height;
+    const hh = Math.max((portrait ? 4.75 : 2.51) / TOP_CAMERA_FILL,
+      (portrait ? 2.51 : 4.75) / (aspect * TOP_CAMERA_FILL));
+    const apparentTableWidth = (portrait ? 5.02 : 9.5) *
+      layout.viewport.height / (2 * hh);
+    const usableFraction = apparentTableWidth / layout.viewport.width;
+    assert.ok(usableFraction >= (config.isMobile ? 0.67 : 0.88),
+      config.name + ' table should fill the playfield, including larger balls; visible fraction=' +
+      usableFraction.toFixed(3));
     const soundControl = page.locator('#sound-toggle');
     assert.equal(await soundControl.getAttribute('aria-pressed'), 'true',
       'sound effects are enabled but must not autoplay');
@@ -121,13 +133,13 @@ try {
     }
     // Point at the apex of the pool triangle from the centred cue position. Project known
     // world coordinates through the same orthographic framing in both sizes.
-    const rackScreen = await page.locator('#viewport canvas').evaluate((canvas) => {
+    const rackScreen = await page.locator('#viewport canvas').evaluate((canvas, fill) => {
       const rect = canvas.getBoundingClientRect();
       const aspect = rect.width / rect.height;
       const portrait = rect.width <= 700 && rect.height > rect.width * 1.15;
       const halfWorldWidth = portrait ? 2.51 : 4.75;
       const halfWorldHeight = portrait ? 4.75 : 2.51;
-      const halfHeight = Math.max(halfWorldHeight / 0.89, halfWorldWidth / (aspect * 0.89));
+      const halfHeight = Math.max(halfWorldHeight / fill, halfWorldWidth / (aspect * fill));
       const scale = rect.height / (2 * halfHeight);
       const rackX = 2.05, rackZ = 0;
       return portrait
@@ -135,7 +147,7 @@ try {
             y: rect.top + rect.height / 2 - rackX * scale }
         : { x: rect.left + rect.width / 2 + rackX * scale,
             y: rect.top + rect.height / 2 + rackZ * scale };
-    });
+    }, TOP_CAMERA_FILL);
     await page.mouse.move(rackScreen.x, rackScreen.y);
     await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
     const lens = page.locator('#target-lens');
@@ -156,13 +168,13 @@ try {
     }
     // The actual opening rack offers a clear line towards the upper-left
     // corner's long-rail jaw. The guide must now identify that physical jaw.
-    const jawScreen = await page.locator('#viewport canvas').evaluate((canvas) => {
+    const jawScreen = await page.locator('#viewport canvas').evaluate((canvas, fill) => {
       const rect = canvas.getBoundingClientRect();
       const aspect = rect.width / rect.height;
       const portrait = rect.width <= 700 && rect.height > rect.width * 1.15;
       const halfWorldWidth = portrait ? 2.51 : 4.75;
       const halfWorldHeight = portrait ? 4.75 : 2.51;
-      const halfHeight = Math.max(halfWorldHeight / 0.89, halfWorldWidth / (aspect * 0.89));
+      const halfHeight = Math.max(halfWorldHeight / fill, halfWorldWidth / (aspect * fill));
       const scale = rect.height / (2 * halfHeight);
       const x = -4.12, z = 2.105;
       return portrait
@@ -170,7 +182,7 @@ try {
             y: rect.top + rect.height / 2 - x * scale }
         : { x: rect.left + rect.width / 2 + x * scale,
             y: rect.top + rect.height / 2 + z * scale };
-    });
+    }, TOP_CAMERA_FILL);
     await page.mouse.move(jawScreen.x, jawScreen.y);
     await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimJaw !== '');
     assert.equal(await lens.isVisible(), false,
@@ -211,20 +223,20 @@ try {
     // The cue is much smaller in portrait. Verify its dark marker in actual
     // WebGL screenshot pixels on BOTH desktop and a 390px touch viewport.
     // DOM/CSS-only embellishments cannot satisfy this visual contract.
-    const cueCenter = await page.locator('#viewport canvas').evaluate((canvas) => {
+    const cueCenter = await page.locator('#viewport canvas').evaluate((canvas, fill) => {
       const rect = canvas.getBoundingClientRect();
       const aspect = rect.width / rect.height;
       const portrait = rect.width <= 700 && rect.height > rect.width * 1.15;
       const hw = portrait ? 2.51 : 4.75;
       const hh = portrait ? 4.75 : 2.51;
-      const halfHeight = Math.max(hh / 0.89, hw / (aspect * 0.89));
+      const halfHeight = Math.max(hh / fill, hw / (aspect * fill));
       const scale = rect.height / (2 * halfHeight);
       return portrait
         ? { x: rect.left + rect.width / 2,
             y: rect.top + rect.height / 2 + 2.4 * scale }
         : { x: rect.left + rect.width / 2 - 2.4 * scale,
             y: rect.top + rect.height / 2 };
-    });
+    }, TOP_CAMERA_FILL);
     const cuePixel = samplePngRGB(topPng, Math.round(cueCenter.x), Math.round(cueCenter.y));
     assert.ok(cuePixel[0] < 155 && cuePixel[2] > cuePixel[0] * 1.18,
       config.name + ' cue spot must contrast against ivory even at phone scale: ' + cuePixel);
@@ -456,6 +468,45 @@ try {
     console.log('SNOOKER_BROWSER_' + config.name.toUpperCase() + '_PASS', dimensions);
     await context.close();
   }
+
+  // Short laptop viewport: the main player report showed wasted horizontal
+  // gutters on a wide but short browser window. This is a real WebGL check
+  // with all six rails/pockets in frame and no controls overlapping the game.
+  const laptop = await browser.newContext({
+    viewport: { width: 1198, height: 614 }, deviceScaleFactor: 1,
+  });
+  const laptopPage = await laptop.newPage();
+  const laptopErrors = [];
+  laptopPage.on('pageerror', (error) => laptopErrors.push(error.message));
+  await laptopPage.goto('http://127.0.0.1:4173/', { waitUntil: 'load' });
+  await laptopPage.locator('#viewport canvas').waitFor({ state: 'visible' });
+  await laptopPage.waitForTimeout(450);
+  const compact = await laptopPage.evaluate(() => {
+    const rect = (q) => document.querySelector(q).getBoundingClientRect().toJSON();
+    return { viewport: rect('#viewport'), header: rect('.topbar'),
+      controls: rect('.bottom-panel'), label: rect('.table-label'),
+      gameWidth: window.innerWidth };
+  });
+  assert.ok(compact.viewport.top >= compact.header.bottom - 1,
+    'compact laptop playfield must clear brand and scoreboard');
+  assert.ok(compact.viewport.bottom <= compact.controls.top + 1,
+    'compact controls must not cover the enlarged table: ' + JSON.stringify(compact));
+  const compactAspect = compact.viewport.width / compact.viewport.height;
+  const compactHH = Math.max(2.51 / TOP_CAMERA_FILL,
+    4.75 / (compactAspect * TOP_CAMERA_FILL));
+  const tableWidthPx = 9.5 * compact.viewport.height / (2 * compactHH);
+  assert.ok(tableWidthPx / compact.gameWidth > 0.60,
+    'short laptop table must fill >60% of browser width without zoom/cropping');
+  const laptopPng = await laptopPage.screenshot({
+    path: 'artifacts/snooker-compact-laptop-top.png',
+    fullPage: true, animations: 'disabled',
+  });
+  assert.ok(screenshotShowsFelt(laptopPng, compact.viewport),
+    'short laptop table must render real WebGL felt');
+  assert.deepEqual(laptopErrors, []);
+  console.log('SNOOKER_BROWSER_COMPACT_LAPTOP_PASS',
+    { viewport: compact.viewport.height, tableWidth: Math.round(tableWidthPx) });
+  await laptop.close();
 } finally {
   await browser.close();
 }
