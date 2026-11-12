@@ -566,6 +566,58 @@ try {
   });
   assert.ok(screenshotShowsFelt(zoomPng, wideLayout.viewport),
     'precision must render the true 3D felt, not a CSS-scaled fake');
+  const zoomFocus = Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-x'));
+  assert.ok(Math.abs(zoomFocus + 0.175) < 0.005, 'zoom centres on the real cue-to-rack segment');
+  const aimBeforePan = await widePage.locator('#viewport').getAttribute('data-aim-target');
+  // Right-button drag moves the camera (not the cue or the aim vector).
+  await widePage.mouse.move(closeRackX, rackY);
+  await widePage.mouse.down({ button: 'right' });
+  await widePage.mouse.move(closeRackX + 120, rackY + 80, { steps: 6 });
+  await widePage.mouse.up({ button: 'right' });
+  const movedX = Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-x'));
+  const movedZ = Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-z'));
+  assert.ok(movedX < zoomFocus - 0.5 && movedZ < -0.3,
+    'right-button drag should pan the orthographic camera in both axes');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-target'),
+    aimBeforePan, 'pan cannot silently change the next shot');
+  assert.equal(await widePage.locator('#shots').innerText(), '00');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-panning'), '',
+    'drag gesture clears on pointer release');
+  const pannedPng = await widePage.screenshot({
+    path: 'artifacts/snooker-wide-precision-panned.png',
+    fullPage: true, animations: 'disabled',
+  });
+  assert.ok(screenshotShowsFelt(pannedPng, wideLayout.viewport),
+    'panned camera still paints the real billiards table');
+  // Shift+arrows are accessible camera movement; ordinary arrows remain
+  // the pre-existing fine-aim keys.
+  await widePage.evaluate(() => document.activeElement?.blur());
+  await widePage.keyboard.press('Shift+ArrowRight');
+  const keyboardFocus = Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-x'));
+  assert.ok(keyboardFocus > movedX + 0.2, 'Shift+Right pans without re-aiming');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-target'),
+    aimBeforePan);
+  // A left-button Shift drag uses the same pathway as right drag.
+  await widePage.mouse.move(closeRackX, rackY);
+  await widePage.keyboard.down('Shift');
+  await widePage.mouse.down({ button: 'left' });
+  await widePage.mouse.move(closeRackX + 50, rackY, { steps: 3 });
+  await widePage.mouse.up({ button: 'left' });
+  await widePage.keyboard.up('Shift');
+  assert.ok(Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-x')) <
+    keyboardFocus - 0.15, 'Shift+left-drag pans without replacing the aim');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-target'),
+    aimBeforePan);
+  // The raycaster must still target ball 1 at its NEW onscreen location.
+  const afterPanFocus = Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-x'));
+  const afterPanZ = Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-z'));
+  const rackAfterPanX = wideLayout.windowWidth / 2 +
+    (2.05 - afterPanFocus) * (wideTableWidth / 9.5) * PRECISION_ZOOM;
+  const rackAfterPanY = rackY +
+    (0 - afterPanZ) * (wideTableWidth / 9.5) * PRECISION_ZOOM;
+  await widePage.mouse.move(rackAfterPanX, rackAfterPanY);
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
+  assert.equal(await widePage.locator('#shots').innerText(), '00');
   await zoom.click();
   assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'full');
   await zoom.click();

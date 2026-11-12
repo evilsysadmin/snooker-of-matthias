@@ -15,7 +15,7 @@ import { newSoloChallenge, settleSoloShot, readSoloBest, saveSoloBest } from './
 import { createFeedbackGate, createBilliardsAudio } from './shotFeedback.js';
 import { poolBallSpec, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
-  CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, precisionFocus } from './poolVisuals.js';
+  CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, precisionFocus, panPrecisionFocus } from './poolVisuals.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -506,6 +506,7 @@ let balls = createRack();
 let shots = 0;
 let potted = 0;
 let dragging = false;
+let panPointer = null;
 let wasMoving = false;
 let scratchPending = false;
 let placementPrompted = false;
@@ -655,6 +656,8 @@ function restart() {
     precisionZoom = false;
     syncTopFraming();
   }
+  panPointer = null;
+  viewport.dataset.panning = '';
   cancelCharge();
   feedbackGate.reset();
   for (const pulse of pocketPulses) pulse.ring.visible = false;
@@ -772,6 +775,18 @@ window.addEventListener('keydown', (event) => {
   // Keep native Space activation for focused buttons/sliders (including camera controls).
   if (event.target instanceof HTMLButtonElement || event.target instanceof HTMLInputElement ||
       event.altKey || event.ctrlKey || event.metaKey) return;
+  // Shift + arrows pan the precision camera; unmodified arrows keep their
+  // original 0.5-degree aiming contract. No shot or physics calls here.
+  if (precisionZoom && camera === topCamera && event.shiftKey &&
+      ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+    event.preventDefault();
+    const shift = 0.25;
+    movePrecisionCamera(event.key === 'ArrowRight' ? shift :
+      event.key === 'ArrowLeft' ? -shift : 0,
+      event.key === 'ArrowDown' ? shift :
+      event.key === 'ArrowUp' ? -shift : 0);
+    return;
+  }
   if (event.code === 'Space') {
     event.preventDefault();
     if (!event.repeat && !ballsMoving(balls) && !balls[0].pocketed) {
@@ -832,28 +847,71 @@ function pointAim(event, commitPlacement = false) {
 }
 const canvas = renderer.domElement;
 canvas.style.touchAction = 'none';
+function finishPan(event) {
+  if (panPointer?.id !== event.pointerId) return false;
+  panPointer = null;
+  viewport.dataset.panning = '';
+  return true;
+}
+canvas.addEventListener('contextmenu', (event) => {
+  if (precisionZoom && camera === topCamera) event.preventDefault();
+});
 canvas.addEventListener('pointerdown', (event) => {
+  // Pan gestures never call pointAim, including on pointerdown: preserving
+  // the exact aim direction is more important than responding to hover.
+  if (precisionZoom && camera === topCamera && event.pointerType === 'mouse' &&
+      (event.button === 2 || (event.button === 0 && event.shiftKey))) {
+    if (panPointer) return;
+    panPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    dragging = false;
+    viewport.dataset.panning = 'active';
+    canvas.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    return;
+  }
+  if (event.button !== 0 || panPointer) return;
   dragging = true;
   if (scratchPending) placementPointerId = event.pointerId;
   canvas.setPointerCapture(event.pointerId);
   pointAim(event, scratchPending);
 });
 canvas.addEventListener('pointermove', (event) => {
+  if (panPointer) {
+    if (panPointer.id !== event.pointerId) return;
+    const dx = event.clientX - panPointer.x;
+    const dy = event.clientY - panPointer.y;
+    panPointer.x = event.clientX;
+    panPointer.y = event.clientY;
+    // The mouse drags the TABLE, so camera motion is the inverse delta.
+    // The world-per-pixel conversion comes from the real Three.js frustum.
+    const rect = canvas.getBoundingClientRect();
+    movePrecisionCamera(-dx * (topCamera.right - topCamera.left) /
+      (rect.width * topCamera.zoom),
+      -dy * (topCamera.top - topCamera.bottom) /
+      (rect.height * topCamera.zoom));
+    event.preventDefault();
+    return;
+  }
+  if (precisionZoom && camera === topCamera &&
+      event.pointerType === 'mouse' && event.shiftKey) return;
   // Do not accidentally re-aim while the finger that placed the white is held.
   if (placementPointerId !== null && !scratchPending) return;
   if (event.pointerType === 'mouse' || dragging) pointAim(event);
 });
 canvas.addEventListener('pointerup', (event) => {
+  if (finishPan(event)) return;
   if (placementPointerId === event.pointerId) {
     if (scratchPending) pointAim(event, true);
     placementPointerId = null;
   }
   dragging = false;
 });
-canvas.addEventListener('pointercancel', () => {
+canvas.addEventListener('pointercancel', (event) => {
+  finishPan(event);
   dragging = false;
   placementPointerId = null;
 });
+canvas.addEventListener('lostpointercapture', (event) => finishPan(event));
 
 // On narrow portrait screens the physical balls are only a few pixels wide.
 // Show the actual *first predicted contact* enlarged in the side gutter,
@@ -979,6 +1037,13 @@ for (const x of [-4.75, 4.75]) {
   }
 }
 const projectedCorner = new THREE.Vector3();
+function movePrecisionCamera(dxWorld, dzWorld) {
+  if (!precisionZoom || camera !== topCamera) return;
+  precisionAnchor = panPrecisionFocus(precisionAnchor, dxWorld, dzWorld,
+    TABLE.halfX, TABLE.halfZ);
+  syncTopFraming();
+  lensPositionDirty = true;
+}
 function syncTopFraming() {
   const focus = precisionZoom ? precisionAnchor : { x: 0, z: 0 };
   topCamera.zoom = precisionZoom ? PRECISION_ZOOM : 1;
@@ -987,10 +1052,15 @@ function syncTopFraming() {
   topCamera.updateProjectionMatrix();
   topCamera.updateMatrixWorld();
   viewport.dataset.zoom = precisionZoom ? 'precision' : 'full';
+  viewport.dataset.cameraFocusX = precisionZoom ? focus.x.toFixed(3) : '0.000';
+  viewport.dataset.cameraFocusZ = precisionZoom ? focus.z.toFixed(3) : '0.000';
   precisionZoomButton.setAttribute('aria-pressed', String(precisionZoom));
   precisionZoomButton.textContent = precisionZoom ? 'Ver mesa' : 'Zoom ×1,4';
   precisionZoomButton.setAttribute('aria-label', precisionZoom
     ? 'Restaurar vista completa de la mesa' : 'Acercar la mesa 1,4 veces en vista cenital');
+  precisionZoomButton.title = precisionZoom
+    ? 'Arrastra con botón derecho o Mayús + ratón · Mayús + flechas para mover · pulsa para ver la mesa'
+    : 'Ampliar la puntería sin alterar el tiro';
 }
 function resize() {
   const rect = viewport.getBoundingClientRect();
@@ -1056,6 +1126,8 @@ function resize() {
 function setCameraMode(mode) {
   if (mode === '3d' && precisionZoom) {
     precisionZoom = false;
+    panPointer = null;
+    viewport.dataset.panning = '';
     syncTopFraming();
   }
   camera = mode === '3d' ? perspectiveCamera : topCamera;
@@ -1077,6 +1149,8 @@ precisionZoomButton.addEventListener('click', () => {
     precisionAnchor = precisionFocus(cue, target);
   }
   precisionZoom = !precisionZoom;
+  panPointer = null;
+  viewport.dataset.panning = '';
   setCameraMode('top');
   syncTopFraming();
   lensPositionDirty = true;
