@@ -1,11 +1,18 @@
 // Canonical premium pool table finishing. All textures are procedural:
 // no network, asset downloads, new renderer dependency or physics coupling.
 export const BALL_COLORS = Object.freeze([
-  '#f7f5eb', '#e9bc24', '#2259a7', '#b51f32', '#63358d',
+  '#fff9e7', '#e9bc24', '#2259a7', '#b51f32', '#63358d',
   '#e7801f', '#19724d', '#7b3526', '#131a20',
   '#e9bc24', '#2259a7', '#b51f32', '#63358d',
   '#e7801f', '#19724d', '#7b3526',
 ]);
+// Stronger *readability*, not a larger physical cue ball: real top-pole
+// marker and a fine felt-level cue-selection ring that disappears in motion.
+export const CUE_BALL_MARKER = Object.freeze({
+  spotColor: 0x1a4555, ringColor: 0xfbe0a2, rimColor: 0x0c3028,
+  spotRadiusScale: 0.27, ringRadiusScale: 1.48,
+});
+export const STRIPE_IVORY = '#dce1da';
 export const LONG_RAIL_SIGHTS = Object.freeze([-3.56, -2.52, -1.44, 1.44, 2.52, 3.56]);
 export const SHORT_RAIL_SIGHTS = Object.freeze([-1.02, 0, 1.02]);
 
@@ -85,7 +92,7 @@ export function createWalnutTexture(THREE, documentRef = document) {
 export function createBallTexture(THREE, number, documentRef = document) {
   const spec = poolBallSpec(number);
   const [surface, ctx] = canvas(512, documentRef);
-  ctx.fillStyle = spec.striped ? '#f7f4e8' : spec.color;
+  ctx.fillStyle = spec.striped ? STRIPE_IVORY : spec.color;
   ctx.fillRect(0, 0, 512, 512);
   if (spec.striped) {
     ctx.fillStyle = spec.color;
