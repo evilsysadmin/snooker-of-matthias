@@ -168,7 +168,7 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
 /* Wide desktop: one compact control rail below an enlarged playfield.
    The breakpoints deliberately leave the original stacked/mobile HUD intact. */
 @media (min-width: 1050px) and (min-height: 650px) {
-  #viewport { inset: 80px 0 110px; }
+  #viewport { inset: 92px 0 110px; }
   .camera-switch { top: 93px; }
   .table-label { top: 52px; }
   .bottom-panel {
@@ -503,7 +503,7 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
    The camera's tighter full-table fit then enlarges every ball without
    changing any physical radius or hiding pockets. */
 @media (min-width: 1050px) and (max-height: 649px) {
-  #viewport { inset: 80px 0 112px; }
+  #viewport { inset: 92px 0 112px; }
   .table-label { top: 52px; }
   .bottom-panel {
     width: min(1170px, calc(100% - 28px));
