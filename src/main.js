@@ -10,7 +10,7 @@ import { predictFirstContact } from './aimPrediction.js';
 import { FINE_AIM_STEP_DEGREES, rotateAim } from './fineAim.js';
 import { resolveStrokePower } from './strokeInteraction.js';
 import { remainingObjectBalls } from './practiceRules.js';
-import { createVersionWatcher } from './versionNotice.js';
+import { canShowUpdateNotice, createVersionWatcher } from './versionNotice.js';
 import { newSoloChallenge, settleSoloShot, readSoloBest, saveSoloBest } from './soloChallenge.js';
 import { createFeedbackGate, createBilliardsAudio } from './shotFeedback.js';
 import { poolBallSpec, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS,
@@ -470,6 +470,14 @@ soundToggle.addEventListener('click', () => {
   syncSoundButton();
 });
 syncSoundButton();
+function updateNoticeIsSafe() {
+  return canShowUpdateNotice({
+    moving: ballsMoving(balls),
+    charging: charge.active,
+    pointerStroke: Boolean(pointerStroke),
+    strokeAnimation: Boolean(strokeAnimation),
+  });
+}
 const versionWatcher = createVersionWatcher({
   // Vite injects this exact source SHA into the immutable CI build. The
   // authenticated release.json then compares *deployed* vs *running* code.
@@ -477,8 +485,8 @@ const versionWatcher = createVersionWatcher({
   isVisible: () => !document.hidden,
   onAvailable: () => {
     availableUpdate = true;
-    // Never cover a live shot. Show the notice after the balls settle.
-    if (!ballsMoving(balls)) updateBanner.hidden = false;
+    // Wait for the entire stroke, including hold/release and recoil.
+    if (updateNoticeIsSafe()) updateBanner.hidden = false;
   },
 });
 updateLater.addEventListener('click', () => {
@@ -486,7 +494,7 @@ updateLater.addEventListener('click', () => {
   availableUpdate = false;
 });
 updateNow.addEventListener('click', () => {
-  if (ballsMoving(balls)) return; // No automatic interruption of a shot.
+  if (!updateNoticeIsSafe()) return; // An active stroke is never interrupted.
   window.location.reload(); // Explicit click, game state currently resets.
 });
 document.addEventListener('visibilitychange', () => {
@@ -1068,7 +1076,9 @@ function frame(now) {
   wasMoving = nowMoving;
   modePractice.disabled = nowMoving || charge.active;
   modeSolo.disabled = nowMoving || charge.active;
-  if (availableUpdate && !wasMoving) updateBanner.hidden = false;
+  // If the user starts another stroke while the prompt is open, move it out
+  // of the way. Reveal it again only after the cue and balls settle.
+  if (availableUpdate) updateBanner.hidden = !updateNoticeIsSafe();
   if (dirtyHUD) { formatScore(); dirtyHUD = false; }
   if (scratchPending !== wasPlacementMode) {
     wasPlacementMode = scratchPending;
