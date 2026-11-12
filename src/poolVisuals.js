@@ -43,6 +43,17 @@ export function precisionFocus(cue, target) {
   }
   return { x: (cue.x + target.x) / 2, z: (cue.z + target.z) / 2 };
 }
+// Camera-only tracking, updated at display-frame cadence after physics.
+// The time-based easing remains stable on both fast GPUs and slower mobiles.
+export function followPrecisionFocus(anchor, cue, target, seconds, limitX, limitZ) {
+  if (!cue || cue.pocketed || !Number.isFinite(cue.x) || !Number.isFinite(cue.z)) return anchor;
+  const goal = precisionFocus(cue, target?.pocketed ? null : target);
+  const dt = Math.max(0, Math.min(Number.isFinite(seconds) ? seconds : 0, 0.2));
+  const fraction = 1 - Math.exp(-6 * dt);
+  return panPrecisionFocus(anchor,
+    (goal.x - anchor.x) * fraction, (goal.z - anchor.z) * fraction,
+    limitX, limitZ);
+}
 export const CUE_BALL_MARKER = Object.freeze({
   spotColor: 0x1a4555, ringColor: 0xfbe0a2, rimColor: 0x0c3028,
   spotRadiusScale: 0.34, ringRadiusScale: 1.48,

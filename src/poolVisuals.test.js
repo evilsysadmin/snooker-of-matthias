@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BALL_COLORS, CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, MIN_PRECISION_ZOOM, MAX_PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus, STRIPE_IVORY, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS, poolBallSpec,
+  BALL_COLORS, CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, MIN_PRECISION_ZOOM, MAX_PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus, followPrecisionFocus, STRIPE_IVORY, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS, poolBallSpec,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
 } from './poolVisuals.js';
 
@@ -62,6 +62,24 @@ test('precision camera panning is bounded and leaves game coordinates untouched'
     { x: -4.35, z: 2.15 });
   assert.deepEqual(panPrecisionFocus({ x: 4.35, z: -2.15 }, 1, -1, 4.35, 2.15),
     { x: 4.35, z: -2.15 });
+});
+
+test('precision shot tracking eases toward live cue and first-contact target only', () => {
+  const initial = Object.freeze({ x: -0.175, z: 0 });
+  const cue = Object.freeze({ x: -1.4, z: 0.6 });
+  const target = Object.freeze({ x: 2.05, z: 0 });
+  assert.deepEqual(followPrecisionFocus(initial, cue, target, 0, 4.35, 2.15), initial);
+  const next = followPrecisionFocus(initial, cue, target, 1 / 60, 4.35, 2.15);
+  assert.ok(next.x > initial.x && next.x < (cue.x + target.x) / 2);
+  assert.ok(next.z > 0 && next.z < cue.z / 2);
+  assert.deepEqual(initial, { x: -0.175, z: 0 }, 'no mutation of camera anchor');
+  assert.deepEqual(cue, { x: -1.4, z: 0.6 }, 'no mutation of physics ball');
+  const stopped = followPrecisionFocus(next, { ...cue, pocketed: true }, target, 1 / 60, 4.35, 2.15);
+  assert.equal(stopped, next, 'scratch cannot follow a pocketed cue');
+  const pottedTarget = followPrecisionFocus(initial, cue, { ...target, pocketed: true }, 0.2, 4.35, 2.15);
+  assert.ok(pottedTarget.x < initial.x, 'when target is pocketed the camera follows the white');
+  const clamped = followPrecisionFocus({ x: 4.3, z: 2.1 }, { x: 50, z: 50 }, null, 1, 4.35, 2.15);
+  assert.ok(clamped.x <= 4.35 && clamped.z <= 2.15);
 });
 
 test('the cue has a visible unique marker, unchanged physics size and muted stripe white', () => {

@@ -15,7 +15,8 @@ import { newSoloChallenge, settleSoloShot, readSoloBest, saveSoloBest } from './
 import { createFeedbackGate, createBilliardsAudio } from './shotFeedback.js';
 import { poolBallSpec, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
-  CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus } from './poolVisuals.js';
+  CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus,
+  followPrecisionFocus } from './poolVisuals.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -500,6 +501,17 @@ const placementGhost = new THREE.Mesh(
 placementGhost.renderOrder = 5;
 placementGhost.visible = false;
 scene.add(placementGhost);
+// Subtle genuine 3D halo on the predicted first-hit ball, not a DOM overlay.
+// Only appears while idle in opt-in precision zoom; never touches physics.
+const precisionTargetHalo = new THREE.Mesh(
+  new THREE.TorusGeometry(TABLE.ballRadius * 1.53, 0.011, 7, 40),
+  new THREE.MeshBasicMaterial({ color: 0xf4c67b, transparent: true, opacity: 0.68,
+    depthTest: false, depthWrite: false }),
+);
+precisionTargetHalo.rotation.x = -Math.PI / 2;
+precisionTargetHalo.renderOrder = 4;
+precisionTargetHalo.visible = false;
+scene.add(precisionTargetHalo);
 const cueDirection = new THREE.Vector3(1, 0, 0);
 const reducedCueMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -508,6 +520,9 @@ let shots = 0;
 let potted = 0;
 let dragging = false;
 let panPointer = null;
+let precisionManualPan = false;
+let precisionFollowActive = false;
+let precisionFollowTargetId = null;
 let wasMoving = false;
 let scratchPending = false;
 let placementPrompted = false;
@@ -658,6 +673,9 @@ function restart() {
     syncTopFraming();
   }
   panPointer = null;
+  precisionManualPan = false;
+  precisionFollowActive = false;
+  precisionFollowTargetId = null;
   viewport.dataset.panning = '';
   cancelCharge();
   feedbackGate.reset();
@@ -697,7 +715,12 @@ function shoot(power = Number(powerInput.value) / 100) {
   if (mode === 'solo' && solo.completed) return;
   const cue = balls[0];
   const shotPosition = { x: cue.x, z: cue.z, dx: aim.x, dz: aim.z };
+  // Read the actual next contact before physics mutates the moving rack.
+  const contact = precisionZoom && !precisionManualPan
+    ? predictFirstContact(balls, aim.x, aim.z) : null;
   if (strikeCue(balls, aim.x, aim.z, power, cueSpin)) {
+    precisionFollowActive = precisionZoom && !precisionManualPan;
+    precisionFollowTargetId = contact?.ballId ?? null;
     // WebAudio is created only by a real user shot, never at page load.
     soundFX.unlock();
     soundFX.play('strike', power);
@@ -975,6 +998,8 @@ function syncTargetLens(id) {
 
 function updateCue(now) {
   const cue = balls[0];
+  precisionTargetHalo.visible = false;
+  viewport.dataset.precisionTarget = '';
   ghostRing.visible = false;
   impactDot.visible = false;
   placementGhost.visible = scratchPending && !ballsMoving(balls) && Boolean(placementCandidate);
@@ -1025,6 +1050,11 @@ function updateCue(now) {
   guide.computeLineDistances();
   if (preview.ballId !== null) {
     const target = balls.find((ball) => ball.id === preview.ballId);
+    if (precisionZoom && camera === topCamera && target && !target.pocketed) {
+      precisionTargetHalo.position.set(target.x, TABLE.ballRadius + 0.052, target.z);
+      precisionTargetHalo.visible = true;
+      viewport.dataset.precisionTarget = String(target.id);
+    }
     ghostRing.position.set(preview.x, 0.102, preview.z);
     ghostRing.visible = true;
     // The contact lies halfway between the centres of two equal-radius balls,
@@ -1068,6 +1098,8 @@ function movePrecisionCamera(dxWorld, dzWorld) {
   if (!precisionZoom || camera !== topCamera) return;
   precisionAnchor = panPrecisionFocus(precisionAnchor, dxWorld, dzWorld,
     TABLE.halfX, TABLE.halfZ);
+  precisionManualPan = true;
+  precisionFollowActive = false;
   syncTopFraming();
   lensPositionDirty = true;
 }
@@ -1158,6 +1190,9 @@ function setCameraMode(mode) {
   if (mode === '3d' && precisionZoom) {
     precisionZoom = false;
     panPointer = null;
+    precisionFollowActive = false;
+    precisionFollowTargetId = null;
+    precisionManualPan = false;
     viewport.dataset.panning = '';
     syncTopFraming();
   }
@@ -1181,6 +1216,9 @@ precisionZoomButton.addEventListener('click', () => {
   }
   precisionZoom = !precisionZoom;
   panPointer = null;
+  precisionManualPan = false;
+  precisionFollowActive = false;
+  precisionFollowTargetId = null;
   viewport.dataset.panning = '';
   setCameraMode('top');
   syncTopFraming();
@@ -1279,6 +1317,27 @@ function frame(now) {
     if (wasMoving && mode === 'practice' && !scratchPending && remainingObjectBalls(balls) === 0) {
       say('Matthias: Todas dentro. Me veo obligado, muy a mi pesar, a felicitarte.');
     }
+  }
+  // Follow the real white and, while present, the first predicted object
+  // during an active shot. Tracking settles gently after motion stops, but
+  // never pulls the camera away from a player's manual pan.
+  if (precisionZoom && camera === topCamera && precisionFollowActive &&
+      !precisionManualPan && !balls[0].pocketed && !panPointer) {
+    const target = balls.find((ball) => ball.id === precisionFollowTargetId && !ball.pocketed);
+    const next = followPrecisionFocus(precisionAnchor, balls[0], target, elapsed,
+      TABLE.halfX, TABLE.halfZ);
+    const drift = Math.hypot(next.x - precisionAnchor.x, next.z - precisionAnchor.z);
+    if (drift > 0.0001) {
+      precisionAnchor = next;
+      syncTopFraming();
+      lensPositionDirty = true;
+    }
+    if (!nowMoving && drift < 0.001) {
+      precisionFollowActive = false;
+      precisionFollowTargetId = null;
+    }
+  } else if (balls[0].pocketed) {
+    precisionFollowActive = false; // scratches never chase an invisible ball
   }
   wasMoving = nowMoving;
   modePractice.disabled = nowMoving || charge.active;

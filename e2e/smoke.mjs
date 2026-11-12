@@ -670,6 +670,46 @@ try {
   }));
   assert.ok(soloWide.tabletop.top >= soloWide.solo.bottom - 1,
     'solo challenge status must stay clear of the enlarged table');
+
+  // Real active-shot camera tracking: a new practice rack with a first-hit
+  // prediction illuminates the actual target ball only in precision view.
+  await widePage.locator('#mode-practice').click();
+  await widePage.mouse.move(rackX, rackY);
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
+  await zoom.click();
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.precisionTarget === '1');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom-factor'), '1.4');
+  // Aim diagonally into clear cloth, avoiding the rack: the white travels far
+  // enough to exercise a substantial actual camera follow.
+  const wideScale = wideTableWidth / 9.5 * PRECISION_ZOOM;
+  await widePage.mouse.move(wideLayout.windowWidth / 2 +
+    (-1.0 - (-0.175)) * wideScale, rackY + 1.1 * wideScale);
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.precisionTarget === '');
+  const followX0 = Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-x'));
+  const followZ0 = Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-z'));
+  await widePage.locator('#power').evaluate((el) => {
+    el.value = '100';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await widePage.locator('#strike').click();
+  await widePage.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
+  await widePage.waitForFunction(({ x, z }) => {
+    const el = document.querySelector('#viewport');
+    return Math.hypot(Number(el?.dataset.cameraFocusX) - x,
+      Number(el?.dataset.cameraFocusZ) - z) > 0.25;
+  }, { x: followX0, z: followZ0 }, { timeout: 20000 });
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'precision');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-precision-target'), '',
+    'the aiming halo must disappear throughout an active rolling stroke');
+  const followPng = await widePage.screenshot({
+    path: 'artifacts/snooker-wide-precision-follow-shot.png',
+    fullPage: true, animations: 'disabled',
+  });
+  assert.ok(screenshotShowsFelt(followPng, wideLayout.viewport),
+    'the tracked physical shot must keep real WebGL cloth visible');
+  await widePage.locator('#restart').click();
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'full');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-precision-target'), '');
   assert.deepEqual(wideErrors, [], 'wide desktop browser runtime errors');
   console.log('SNOOKER_BROWSER_WIDE_DESKTOP_PASS',
     { viewport: wideLayout.viewport.height, tableWidth: Math.round(wideTableWidth) });
