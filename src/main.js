@@ -16,7 +16,7 @@ import { createFeedbackGate, createBilliardsAudio } from './shotFeedback.js';
 import { poolBallSpec, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
   CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus,
-  followPrecisionFocus } from './poolVisuals.js';
+  followPrecisionFocus, zoomPrecisionFocusAtPoint } from './poolVisuals.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -906,12 +906,21 @@ canvas.addEventListener('contextmenu', (event) => {
 // Only deliberate zoom view consumes the wheel. Normal gameplay and 3D
 // retain their existing browser input behavior.
 canvas.addEventListener('wheel', (event) => {
-  if (!precisionZoom || camera !== topCamera) return;
+  if (!precisionZoom || camera !== topCamera || event.ctrlKey || event.metaKey ||
+      panPointer) return;
   event.preventDefault();
   const unit = event.deltaMode === 1 ? 24 : event.deltaMode === 2 ? 200 : 120;
   const steps = Math.sign(-event.deltaY) *
     Math.min(10, Math.max(1, Math.ceil(Math.abs(event.deltaY) / unit)));
-  if (event.deltaY !== 0) changePrecisionZoom(steps);
+  if (event.deltaY === 0) return;
+  // Sample the REAL ortho ray on the cloth BEFORE changing the camera.
+  // No pointAim call: wheel zoom must never update the next shot direction.
+  const rect = canvas.getBoundingClientRect();
+  pointer.set((event.clientX - rect.left) / rect.width * 2 - 1,
+    -(event.clientY - rect.top) / rect.height * 2 + 1);
+  ray.setFromCamera(pointer, topCamera);
+  const hit = ray.ray.intersectPlane(clothPlane, point);
+  changePrecisionZoom(steps, hit ? { x: point.x, z: point.z } : null);
 }, { passive: false });
 canvas.addEventListener('pointerdown', (event) => {
   // Pan gestures never call pointAim, including on pointerdown: preserving
@@ -1101,10 +1110,18 @@ for (const x of [-4.75, 4.75]) {
   }
 }
 const projectedCorner = new THREE.Vector3();
-function changePrecisionZoom(steps) {
+function changePrecisionZoom(steps, cursorPoint = null) {
   if (!precisionZoom || camera !== topCamera) return;
   const next = adjustPrecisionZoom(precisionZoomLevel, steps);
   if (next === precisionZoomLevel) return;
+  if (cursorPoint) {
+    precisionAnchor = zoomPrecisionFocusAtPoint(
+      precisionAnchor, cursorPoint, precisionZoomLevel, next,
+      TABLE.halfX, TABLE.halfZ);
+    // Explicit user framing always wins over the automatic shot follower.
+    precisionManualPan = true;
+    precisionFollowActive = false;
+  }
   precisionZoomLevel = next;
   syncTopFraming();
   lensPositionDirty = true;
@@ -1137,7 +1154,7 @@ function syncTopFraming() {
       ' veces. Pulsa para restaurar la mesa completa'
     : 'Acercar la mesa 1,4 veces en vista cenital');
   precisionZoomButton.title = precisionZoom
-    ? 'Rueda o +/−: zoom 1,2×–2,2× · botón derecho/Mayús + arrastrar: mover · pulsa para ver la mesa'
+    ? 'Rueda: acerca el punto bajo el cursor · +/−: zoom centrado · botón derecho/Mayús + arrastrar: mover'
     : 'Ampliar la puntería sin alterar el tiro';
   compactZoomButton.setAttribute('aria-pressed', String(precisionZoom));
   compactZoomButton.textContent = precisionZoom
@@ -1146,7 +1163,7 @@ function syncTopFraming() {
     ? 'Restaurar mesa completa, tecla Z' : 'Activar zoom de precisión, tecla Z');
   compactZoomButton.title = precisionZoom
     ? 'Zoom ' + precisionZoomLevel.toFixed(1).replace('.', ',') +
-      '× · rueda o +/- para ajustar · tecla Z para salir'
+      '× · rueda acerca el punto bajo el cursor · tecla Z para salir'
     : 'Zoom de precisión de 1,4× a 2,2× · tecla Z';
 }
 function resize() {

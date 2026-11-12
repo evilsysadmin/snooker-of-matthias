@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BALL_COLORS, CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, MIN_PRECISION_ZOOM, MAX_PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus, followPrecisionFocus, STRIPE_IVORY, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS, poolBallSpec,
+  BALL_COLORS, CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, MIN_PRECISION_ZOOM, MAX_PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus, zoomPrecisionFocusAtPoint, followPrecisionFocus, STRIPE_IVORY, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS, poolBallSpec,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
 } from './poolVisuals.js';
 
@@ -50,6 +50,27 @@ test('graduated optical zoom is discrete, clamped and deterministic', () => {
   assert.equal(adjustPrecisionZoom(NaN, 1), PRECISION_ZOOM);
   assert.equal(adjustPrecisionZoom(1.4, Infinity), PRECISION_ZOOM);
   assert.equal(PRECISION_ZOOM, 1.4, 'initial opt-in view remains 1.4x');
+});
+
+test('wheel zoom keeps a chosen cloth spot at the same screen coordinate', () => {
+  const focus = Object.freeze({ x: -0.175, z: 0.0 });
+  const worldPoint = Object.freeze({ x: 2.05, z: 0.5 });
+  const next = zoomPrecisionFocusAtPoint(focus, worldPoint, 1.4, 1.6, 4.35, 2.15);
+  const project = (value, anchor, zoom) => (value - anchor) * zoom;
+  for (const axis of ['x', 'z']) {
+    assert.ok(Math.abs(project(worldPoint[axis], focus[axis], 1.4) -
+      project(worldPoint[axis], next[axis], 1.6)) < 1e-10,
+      'target stays under the same pixel in ' + axis);
+  }
+  const restored = zoomPrecisionFocusAtPoint(next, worldPoint, 1.6, 1.4, 4.35, 2.15);
+  assert.ok(Math.abs(restored.x - focus.x) < 1e-10);
+  assert.ok(Math.abs(restored.z - focus.z) < 1e-10);
+  assert.deepEqual(focus, { x: -0.175, z: 0 }, 'do not change prior camera state');
+  assert.deepEqual(worldPoint, { x: 2.05, z: 0.5 }, 'do not change physical target');
+  assert.equal(zoomPrecisionFocusAtPoint(focus, null, 1.4, 1.6, 4.35, 2.15), focus);
+  assert.equal(zoomPrecisionFocusAtPoint(focus, worldPoint, 1.4, 1.4, 4.35, 2.15), focus);
+  assert.deepEqual(zoomPrecisionFocusAtPoint(focus, { x: 99, z: 99 }, 1.2, 2.2, 4.35, 2.15),
+    { x: 4.35, z: 2.15 }, 'clamping keeps tabletop discoverable');
 });
 
 test('precision camera panning is bounded and leaves game coordinates untouched', () => {
