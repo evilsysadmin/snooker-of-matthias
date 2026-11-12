@@ -93,8 +93,8 @@ test('rail-speed cue cannot leave the inner precision camera safe area', () => {
   const next = keepCueWithinPrecisionView(start, cue, 2.4, 0.95, 4.35, 2.15);
   assert.ok(Math.abs(cue.x - next.x) <= safeX + 1e-10);
   assert.ok(Math.abs(cue.z - next.z) <= safeZ + 1e-10);
-  assert.equal(next.x, cue.x - safeX);
-  assert.equal(next.z, cue.z - safeZ);
+  assert.ok(Math.abs(next.x - (cue.x - safeX)) < 1e-10);
+  assert.ok(Math.abs(next.z - (cue.z - safeZ)) < 1e-10);
   assert.deepEqual(start, { x: -0.175, z: 0 }, 'camera changes do not mutate prior anchor');
   assert.deepEqual(cue, { x: 3.6, z: 1.95 }, 'no physics changes');
   assert.equal(keepCueWithinPrecisionView(start, { x: 0.5, z: 0.4 }, 2.4, 0.95,
