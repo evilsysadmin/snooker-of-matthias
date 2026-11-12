@@ -607,12 +607,21 @@ try {
   assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-target'),
     targetBeforeWheel, 'wheel never alters intended first contact');
   // Real raycasting uses the new camera zoom, not the previous screen scale.
+  const focusAt16 = Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-x'));
+  const expectedFocusAt16 = -0.175 + (2.05 + 0.175) * (1 - 1.4 / 1.6);
+  assert.ok(Math.abs(focusAt16 - expectedFocusAt16) < 0.005,
+    'wheel must actually centre zoom on the cursor world spot: ' + focusAt16);
   const closeRackAt16 = wideLayout.windowWidth / 2 +
-    (2.05 + 0.175) * (wideTableWidth / 9.5) * 1.6;
-  await widePage.mouse.move(closeRackAt16, rackY);
-  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
+    (2.05 - focusAt16) * (wideTableWidth / 9.5) * 1.6;
+  assert.ok(Math.abs(closeRackAt16 - closeRackX) < 1,
+    'the exact physical target remains beneath the same pixel after zoom');
+  // Do not move the mouse: the wheel-out must reverse the SAME world anchor.
   await widePage.mouse.wheel(0, 240);
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.zoomFactor === '1.4');
+  assert.ok(Math.abs(Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-x')) +
+    0.175) < 0.005, 'reverse wheel restores camera focus without cumulative drift');
+  await widePage.mouse.move(closeRackX, rackY);
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
   await widePage.mouse.move(closeRackX, rackY);
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
   await widePage.evaluate(() => document.activeElement?.blur());
@@ -620,7 +629,27 @@ try {
   assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom-factor'), '1.5');
   await widePage.keyboard.press('Minus');
   assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom-factor'), '1.4');
+  // Test both orthographic axes with the cursor on empty felt: world point
+  // stays exactly at its pixel location before/after wheel zoom.
+  const offX = wideLayout.windowWidth / 2 + 110;
+  const offY = rackY + 75;
+  await widePage.mouse.move(offX, offY);
+  const aimBeforeOffCenterWheel = await widePage.locator('#viewport').getAttribute('data-aim-target');
+  const focusZ0 = Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-z'));
+  await widePage.mouse.wheel(0, -120);
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom-factor'), '1.5');
+  const focusZ1 = Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-z'));
+  assert.ok(focusZ1 > focusZ0 + 0.015, 'off-axis wheel must shift camera on Z as well');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-target'),
+    aimBeforeOffCenterWheel, 'off-axis wheel does not aim or fire');
+  await widePage.mouse.wheel(0, 120);
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom-factor'), '1.4');
+  assert.ok(Math.abs(Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-z')) -
+    focusZ0) < 0.005, 'reverse wheel restores Z centre without drift');
   // Large touchpad deltas clamp at 2.2x / 1.2x rather than zooming to infinity.
+  // Move the pointer back to the optical centre so these bound checks do not
+  // intentionally reframe the entire table.
+  await widePage.mouse.move(wideLayout.windowWidth / 2, rackY);
   await widePage.mouse.wheel(0, -2400);
   assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom-factor'), '2.2');
   await widePage.mouse.wheel(0, 2400);

@@ -28,6 +28,21 @@ export function adjustPrecisionZoom(current, steps) {
 }
 // Camera movement only; coordinates are table units and never enter physics.
 // Clamp the visual target so a long gesture cannot lose the table completely.
+// Orthographic pointer-anchored zoom. Keep the world-space cloth spot under
+// the cursor at the SAME screen pixel after the focal length changes:
+// cursor = focus + offset/oldZoom = newFocus + offset/newZoom.
+// Clamping applies only at the true tabletop bounds, where an exact
+// cursor lock would otherwise let the camera escape the play area.
+export function zoomPrecisionFocusAtPoint(focus, worldPoint, oldZoom, newZoom, limitX, limitZ) {
+  if (!worldPoint || !Number.isFinite(worldPoint.x) || !Number.isFinite(worldPoint.z) ||
+      !Number.isFinite(oldZoom) || !Number.isFinite(newZoom) ||
+      oldZoom <= 0 || newZoom <= 0 || oldZoom === newZoom) return focus;
+  const factor = 1 - oldZoom / newZoom;
+  return panPrecisionFocus(focus,
+    (worldPoint.x - focus.x) * factor,
+    (worldPoint.z - focus.z) * factor,
+    limitX, limitZ);
+}
 export function panPrecisionFocus(anchor, deltaX, deltaZ, limitX, limitZ) {
   const clamp = (value, limit) => Math.max(-limit, Math.min(limit, value));
   return {
