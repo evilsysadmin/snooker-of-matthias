@@ -21,11 +21,16 @@ test('the cue has a visible unique marker, unchanged physics size and muted stri
   assert.equal(poolBallSpec(9).cue, false);
   assert.equal(BALL_COLORS[0], '#fff9e7');
   assert.equal(STRIPE_IVORY, '#dce1da');
-  assert.ok(CUE_BALL_MARKER.spotRadiusScale >= 0.25,
+  assert.ok(CUE_BALL_MARKER.spotRadiusScale >= 0.32,
     'cue spot must remain legible on the small mobile pool ball');
   assert.ok(CUE_BALL_MARKER.ringRadiusScale > 1.3 &&
     CUE_BALL_MARKER.ringRadiusScale < 1.65,
     'ring is clearly outside cue ball but must not become a giant arcade reticle');
+  assert.ok(CUE_BALL_MARKER.tickDistanceScale > CUE_BALL_MARKER.ringRadiusScale,
+    'cue locator ticks remain outside the ball and its rim');
+  assert.ok(CUE_BALL_MARKER.tickLengthScale >= 0.4 &&
+    CUE_BALL_MARKER.tickLengthScale <= 0.55,
+    'locator strokes are clearly visible without obscuring the cloth');
   assert.notEqual(CUE_BALL_MARKER.spotColor, CUE_BALL_MARKER.ringColor);
 });
 
