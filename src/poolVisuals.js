@@ -8,6 +8,11 @@ export const BALL_COLORS = Object.freeze([
 ]);
 // Stronger *readability*, not a larger physical cue ball: real top-pole
 // marker and a fine felt-level cue-selection ring that disappears in motion.
+// Maximise the entire six-pocket tabletop, not the physical size of the balls.
+// Old 0.89 hid a wide unused band around the table, especially on short
+// laptops. Keep a 3.5% safety margin on the limiting axis so rails/pockets
+// and cue-ball selection visuals remain completely in frame.
+export const TOP_CAMERA_FILL = 0.965;
 export const CUE_BALL_MARKER = Object.freeze({
   spotColor: 0x1a4555, ringColor: 0xfbe0a2, rimColor: 0x0c3028,
   spotRadiusScale: 0.34, ringRadiusScale: 1.48,

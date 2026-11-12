@@ -15,7 +15,7 @@ import { newSoloChallenge, settleSoloShot, readSoloBest, saveSoloBest } from './
 import { createFeedbackGate, createBilliardsAudio } from './shotFeedback.js';
 import { poolBallSpec, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
-  CUE_BALL_MARKER } from './poolVisuals.js';
+  CUE_BALL_MARKER, TOP_CAMERA_FILL } from './poolVisuals.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -991,7 +991,8 @@ function resize() {
   // Orthographic scaling is determined by *both* axes and the available viewport.
   const halfWorldWidth = portrait ? 2.51 : 4.75;
   const halfWorldHeight = portrait ? 4.75 : 2.51;
-  const halfHeight = Math.max(halfWorldHeight / 0.89, halfWorldWidth / (aspect * 0.89));
+  const halfHeight = Math.max(halfWorldHeight / TOP_CAMERA_FILL,
+    halfWorldWidth / (aspect * TOP_CAMERA_FILL));
   topCamera.left = -halfHeight * aspect;
   topCamera.right = halfHeight * aspect;
   topCamera.top = halfHeight;

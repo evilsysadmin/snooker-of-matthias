@@ -457,7 +457,10 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   }
 }
 @media (max-width: 700px) and (min-height: 700px) {
-  #viewport { top: 96px; bottom: 195px; }
+  #viewport { top: 82px; bottom: 195px; }
+  /* In challenge mode the mission pill retains its own space above the
+     first pocket; free practice gets the maximum uninterrupted playfield. */
+  #viewport[data-game-mode="solo"] { top: 120px; }
   .solo-status { top: 99px; }
   /* The manual update action remains accessible and cannot overlap header,
      fine-aim, camera or strike controls on a phone. */
@@ -492,4 +495,27 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   letter-spacing: .035em; white-space: nowrap; }
 @media (max-width: 700px) and (min-height: 700px) {
   .target-lens:not([hidden]) { display: grid; }
+}
+
+/* Laptop screens with little vertical room previously stacked commentary,
+   controls and a huge empty gap beneath an undersized table. Use a compact
+   two-column control rail, keeping *all* inputs outside the playable canvas.
+   The camera's tighter full-table fit then enlarges every ball without
+   changing any physical radius or hiding pockets. */
+@media (min-width: 1050px) and (max-height: 649px) {
+  #viewport { inset: 92px 0 112px; }
+  .table-label { display: none; }
+  .bottom-panel {
+    width: min(1170px, calc(100% - 28px));
+    bottom: 9px;
+    padding: 9px 13px;
+    display: grid;
+    grid-template-columns: minmax(230px, 330px) minmax(0, 1fr);
+    align-items: center;
+    gap: 14px;
+  }
+  .commentary { margin-bottom: 0; }
+  .shot-controls { min-width: 0; gap: 11px; }
+  .power { min-width: 105px; }
+  .hint { display: none; }
 }

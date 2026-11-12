@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BALL_COLORS, CUE_BALL_MARKER, STRIPE_IVORY, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS, poolBallSpec,
+  BALL_COLORS, CUE_BALL_MARKER, TOP_CAMERA_FILL, STRIPE_IVORY, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS, poolBallSpec,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
 } from './poolVisuals.js';
 
@@ -14,6 +14,17 @@ test('American pool balls have exactly one non-striped 8 and unique numbered var
   assert.equal(specs.filter((s) => s.striped).length, 7);
   assert.deepEqual(specs.filter((s) => s.striped).map((s) => s.number), [9,10,11,12,13,14,15]);
   for (const n of [-1, 16, 8.1, NaN]) assert.throws(() => poolBallSpec(n), RangeError);
+});
+
+test('tight orthographic framing magnifies the whole table without clipping its rails', () => {
+  assert.ok(TOP_CAMERA_FILL >= 0.95 && TOP_CAMERA_FILL <= 0.975,
+    'the table should use almost the whole viewport but keep its six pockets in frame');
+  const desktopWidth = 1198, desktopHeight = 424;
+  const heightWorld = Math.max(2.51 / TOP_CAMERA_FILL,
+    4.75 / ((desktopWidth / desktopHeight) * TOP_CAMERA_FILL));
+  const projectedWidth = 9.5 * desktopHeight / (2 * heightWorld);
+  assert.ok(projectedWidth / desktopWidth > 0.6,
+    'a short laptop should display a large tabletop, rather than giant side gutters');
 });
 
 test('the cue has a visible unique marker, unchanged physics size and muted stripe white', () => {
