@@ -597,9 +597,10 @@ try {
   assert.ok(keyboardFocus > movedX + 0.2, 'Shift+Right pans without re-aiming');
   assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-target'),
     aimBeforePan);
-  // A left-button Shift drag uses the same pathway as right drag.
-  await widePage.mouse.move(closeRackX, rackY);
+  // Shift must be held before moving the cursor to the drag start:
+  // ordinary unmodified mouse hover is intentionally still live aiming.
   await widePage.keyboard.down('Shift');
+  await widePage.mouse.move(closeRackX, rackY);
   await widePage.mouse.down({ button: 'left' });
   await widePage.mouse.move(closeRackX + 50, rackY, { steps: 3 });
   await widePage.mouse.up({ button: 'left' });
