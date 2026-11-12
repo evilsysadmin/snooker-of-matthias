@@ -30,6 +30,27 @@ test('American 8-ball has fifteen numbered balls and centred white without overl
   }
 });
 
+test('maximum-power shot reaches and rebounds from a long rail at fixed 120 Hz', () => {
+  // This deterministic physics proof does not depend on Chromium rendering
+  // enough intermediate frames to photograph the instant of rail contact.
+  const balls = createRack();
+  const cue = balls.find((ball) => ball.id === 0);
+  assert.equal(strikeCue(balls, 0, 1, 1), true);
+  let maxZ = cue.z;
+  let rebounded = false;
+  for (let i = 0; i < 120; i++) {
+    stepPhysics(balls, 1 / 120);
+    maxZ = Math.max(maxZ, cue.z);
+    if (cue.vz < 0) rebounded = true;
+  }
+  assert.ok(maxZ > TABLE.halfZ - TABLE.ballRadius - 0.05,
+    'the real high-power white must reach the far cushion');
+  assert.equal(rebounded, true, 'the real cushion must reverse its direction');
+  assert.equal(cue.pocketed, false, 'the ball is not near any pocket mouth');
+  assert.ok(Math.abs(cue.x - CUE_START.x) < 1e-10,
+    'rail rebound does not invent lateral movement');
+});
+
 test('a shot moves the cue, cannot be fired twice while rolling, and stops with friction', () => {
   const balls = createRack();
   assert.equal(strikeCue(balls, 1, 0, 0.35), true);
