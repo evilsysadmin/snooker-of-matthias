@@ -14,7 +14,8 @@ import { canShowUpdateNotice, createVersionWatcher } from './versionNotice.js';
 import { newSoloChallenge, settleSoloShot, readSoloBest, saveSoloBest } from './soloChallenge.js';
 import { createFeedbackGate, createBilliardsAudio } from './shotFeedback.js';
 import { poolBallSpec, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS,
-  createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture } from './poolVisuals.js';
+  createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
+  CUE_BALL_MARKER } from './poolVisuals.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = [
@@ -355,6 +356,17 @@ const ballShadowMaterial = new THREE.MeshBasicMaterial({
   color: 0x03120e, transparent: true, opacity: 0.18,
   depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1,
 });
+const cueShadowMaterial = ballShadowMaterial.clone();
+cueShadowMaterial.opacity = 0.34; // Ground the one pale cue ball on bright felt.
+const cueSpotMaterial = new THREE.MeshBasicMaterial({
+  color: CUE_BALL_MARKER.spotColor, depthWrite: false,
+});
+const cueRingBaseMaterial = new THREE.MeshBasicMaterial({
+  color: CUE_BALL_MARKER.rimColor, depthWrite: false,
+});
+const cueRingMaterial = new THREE.MeshBasicMaterial({
+  color: CUE_BALL_MARKER.ringColor, depthWrite: false,
+});
 function ballModel(number) {
   const spec = poolBallSpec(number);
   const group = new THREE.Group();
@@ -367,7 +379,38 @@ function ballModel(number) {
   shell.castShadow = true;
   shell.receiveShadow = true;
   group.add(shell);
-  if (!spec.cue) {
+  if (spec.cue) {
+    // A proper dark blue-green cue spot on the TOP of the ivory sphere.
+    // Unlike a UI sprite, this is rendered by the real 3D camera.
+    const spot = new THREE.Mesh(
+      new THREE.CircleGeometry(TABLE.ballRadius * CUE_BALL_MARKER.spotRadiusScale, 24),
+      cueSpotMaterial,
+    );
+    spot.rotation.x = -Math.PI / 2;
+    spot.position.y = TABLE.ballRadius + 0.002;
+    spot.renderOrder = 2;
+    group.add(spot);
+
+    // The double-line brass cue indicator is only about 1 ball-radius
+    // wider than the ball. It sits above felt, below the ball silhouette.
+    // Hide it while moving to avoid a misleading moving crosshair.
+    const ring = new THREE.Group();
+    for (const [tube, y, material] of [
+      [0.020, 0.016, cueRingBaseMaterial],
+      [0.011, 0.020, cueRingMaterial],
+    ]) {
+      const circle = new THREE.Mesh(
+        new THREE.TorusGeometry(TABLE.ballRadius * CUE_BALL_MARKER.ringRadiusScale,
+          tube, 6, 48),
+        material,
+      );
+      circle.rotation.x = -Math.PI / 2;
+      circle.position.y = -TABLE.ballRadius + y;
+      ring.add(circle);
+    }
+    group.userData.cueRing = ring;
+    group.add(ring);
+  } else {
     const badge = new THREE.Mesh(
       new THREE.CircleGeometry(TABLE.ballRadius * 0.44, 28),
       new THREE.MeshStandardMaterial({
@@ -380,7 +423,8 @@ function ballModel(number) {
     badge.position.y = TABLE.ballRadius * 1.004;
     group.add(badge);
   }
-  const contact = new THREE.Mesh(ballShadowGeo, ballShadowMaterial);
+  const contact = new THREE.Mesh(ballShadowGeo,
+    spec.cue ? cueShadowMaterial : ballShadowMaterial);
   contact.rotation.x = -Math.PI / 2;
   contact.position.y = -TABLE.ballRadius + 0.005;
   contact.renderOrder = 0;
@@ -1102,6 +1146,10 @@ function frame(now) {
     model.visible = !b.pocketed;
     model.position.set(b.x, TABLE.ballRadius + 0.052, b.z);
   }
+  // Only an idle cue gets the visible aiming marker; moving/pocketed balls
+  // retain exactly the same sphere geometry and collision behaviour.
+  models.get(0).userData.cueRing.visible =
+    !nowMoving && !balls[0].pocketed && !scratchPending;
   updateCue(now);
   animatePocketPulses(now);
   renderer.render(scene, camera);
