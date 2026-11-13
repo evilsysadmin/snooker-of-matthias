@@ -80,6 +80,8 @@ try {
         'portrait phone keeps its uncluttered controls');
       assert.equal(await page.locator('#precision-zoom-compact').isVisible(), false,
         'portrait phone must not lose space to a desktop zoom shortcut');
+      assert.equal(await page.locator('#precision-recenter').isVisible(), false,
+        'phone must not lose playfield room to desktop camera recovery');
       assert.ok(layout.switcher.bottom <= layout.viewport.top + 35,
         'mobile camera selector stays above the upper tabletop cushion');
     }
@@ -139,7 +141,29 @@ try {
       assert.equal(await page.locator('#viewport').getAttribute('data-zoom'), 'precision');
       assert.equal(await compactZoom.getAttribute('aria-pressed'), 'true');
       assert.match(await compactZoom.innerText(), /1,4/);
+      const recenter = page.locator('#precision-recenter');
+      assert.equal(await recenter.isVisible(), false,
+        'recenter recovery stays invisible until camera is manually offset');
       await page.evaluate(() => document.activeElement?.blur());
+      await page.keyboard.press('Shift+ArrowRight');
+      assert.equal(await recenter.isVisible(), true,
+        'desktop manual precision pan reveals return-to-white button');
+      const shiftedFocus = Number(await page.locator('#viewport').getAttribute('data-camera-focus-x'));
+      assert.ok(shiftedFocus > -0.175 + 0.22);
+      await recenter.click();
+      assert.equal(await recenter.isVisible(), false,
+        'click recovery returns to the cue and hides the contextual control');
+      assert.ok(Math.abs(Number(await page.locator('#viewport').getAttribute('data-camera-focus-x')) +
+        0.175) < 0.005, 'return-to-white restores the true cue-rack midpoint');
+      assert.equal(await page.locator('#viewport').getAttribute('data-zoom-factor'), '1.4');
+      await page.evaluate(() => document.activeElement?.blur());
+      await page.keyboard.press('Shift+ArrowRight');
+      assert.equal(await recenter.isVisible(), true);
+      await page.keyboard.press('KeyC');
+      assert.equal(await recenter.isVisible(), false,
+        'C shortcut restores white focus with no other controls focused');
+      assert.equal(await page.locator('#viewport').getAttribute('data-zoom-factor'), '1.4');
+      assert.equal(await page.locator('#shots').innerText(), '00');
       await page.keyboard.press('KeyZ');
       assert.equal(await page.locator('#viewport').getAttribute('data-zoom'), 'full');
       await page.keyboard.press('KeyZ');
@@ -717,6 +741,30 @@ try {
   await widePage.mouse.move(rackAfterPanX, rackAfterPanY);
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
   assert.equal(await widePage.locator('#shots').innerText(), '00');
+  // Return from manual pan without toggling the optical zoom. The cue and
+  // first real target must be reframed, with exact aim/zoom/physics preserved.
+  const recover = widePage.locator('#precision-recenter');
+  assert.equal(await recover.isVisible(), true);
+  const beforeRecenterAim = await widePage.locator('#viewport').getAttribute('data-aim-target');
+  const beforeRecenterZoom = await widePage.locator('#viewport').getAttribute('data-zoom-factor');
+  await recover.click();
+  assert.equal(await recover.isVisible(), false);
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom-factor'),
+    beforeRecenterZoom, 'recenter keeps the chosen optical factor');
+  assert.ok(Math.abs(Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-x')) +
+    0.175) < 0.005);
+  assert.ok(Math.abs(Number(await widePage.locator('#viewport').getAttribute('data-camera-focus-z'))) <
+    0.005, 'recenter restores true cue/target midpoint in both axes');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-target'),
+    beforeRecenterAim, 'camera recovery cannot replace aim');
+  assert.equal(await widePage.locator('#shots').innerText(), '00');
+  await widePage.evaluate(() => document.activeElement?.blur());
+  await widePage.keyboard.press('Shift+ArrowRight');
+  assert.equal(await recover.isVisible(), true);
+  await widePage.keyboard.press('KeyC');
+  assert.equal(await recover.isVisible(), false);
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom-factor'),
+    beforeRecenterZoom);
   await zoom.click();
   assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'full');
   await zoom.click();
