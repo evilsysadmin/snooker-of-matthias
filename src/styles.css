@@ -613,3 +613,29 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
 @media (min-width: 1700px) and (min-height: 740px) and (min-aspect-ratio: 13/6) {
   .precision-zoom-compact { display: none; }
 }
+
+/* Contextual recover-from-pan action. Never covers a pocket or adds a phone
+   control; it appears only on the ordinary lower desktop control rail. */
+.precision-recenter { display: none; }
+.precision-recenter[hidden] { display: none !important; }
+@media (min-width: 1050px) {
+  .precision-recenter:not([hidden]) {
+    display: grid;
+    place-items: center;
+    flex: 0 0 67px;
+    min-width: 67px;
+    min-height: 46px;
+    padding: 0 5px;
+    border: 1px solid #b9c59f66;
+    border-radius: 9px;
+    background: #1c3a32;
+    color: #f4dfb1;
+    font: 800 11px/1 Manrope, sans-serif;
+    white-space: nowrap;
+  }
+  .precision-recenter:hover:not([hidden]) { background: #315448; }
+  .precision-recenter:focus-visible {
+    outline: 2px solid #f9d18b;
+    outline-offset: 2px;
+  }
+}

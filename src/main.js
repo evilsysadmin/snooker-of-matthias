@@ -75,6 +75,9 @@ app.innerHTML = [
       '<button id="precision-zoom-compact" class="precision-zoom-compact" type="button"',
         ' aria-pressed="false" aria-label="Activar zoom de precisión con Z"',
         ' title="Zoom de precisión · tecla Z">Zoom</button>',
+      '<button id="precision-recenter" class="precision-recenter" type="button" hidden',
+        ' aria-label="Centrar cámara en la blanca, tecla C"',
+        ' title="Volver a la blanca y retomar seguimiento · tecla C">◎ Blanca</button>',
     '</div>',
     '<p class="hint">Apunta sobre el paño · ← → ajustan la dirección · ESPACIO golpea · R reinicia.</p>',
     '<div class="fine-aim" role="group" aria-label="Ajuste fino de puntería">',
@@ -105,6 +108,7 @@ const topCameraButton = document.querySelector('#camera-top');
 const perspectiveCameraButton = document.querySelector('#camera-3d');
 const precisionZoomButton = document.querySelector('#precision-zoom');
 const compactZoomButton = document.querySelector('#precision-zoom-compact');
+const precisionRecenterButton = document.querySelector('#precision-recenter');
 const fineLeft = document.querySelector('#fine-left');
 const fineRight = document.querySelector('#fine-right');
 const fineAngle = document.querySelector('#fine-angle');
@@ -816,6 +820,14 @@ window.addEventListener('keydown', (event) => {
     togglePrecisionZoom();
     return;
   }
+  // Restore manual camera framing without exiting the chosen zoom factor.
+  // Input/button focus and browser shortcuts are handled by the guard above.
+  if (event.code === 'KeyC' && !event.repeat && !event.shiftKey &&
+      precisionZoom && camera === topCamera) {
+    event.preventDefault();
+    recenterPrecisionCamera();
+    return;
+  }
   // Keyboard zoom uses the same camera-only clamp as the wheel. Respect
   // focused controls and Ctrl/Cmd browser zoom shortcuts above.
   if (precisionZoom && camera === topCamera && !event.shiftKey &&
@@ -1128,6 +1140,25 @@ function changePrecisionZoom(steps, cursorPoint = null) {
   syncTopFraming();
   lensPositionDirty = true;
 }
+function recenterPrecisionCamera() {
+  if (!precisionZoom || camera !== topCamera || panPointer ||
+      !balls[0] || balls[0].pocketed) return;
+  const moving = ballsMoving(balls);
+  const prediction = moving ? null : predictFirstContact(balls, aim.x, aim.z);
+  const target = prediction?.ballId == null ? null
+    : balls.find((ball) => ball.id === prediction.ballId && !ball.pocketed);
+  const focus = precisionFocus(balls[0], target);
+  // A return to the white is an explicit camera action, not a new shot.
+  // Keep the player's exact zoom and aim, and re-enable follow mid-stroke.
+  precisionAnchor = panPrecisionFocus({ x: 0, z: 0 }, focus.x, focus.z,
+    TABLE.halfX, TABLE.halfZ);
+  precisionManualPan = false;
+  precisionFollowActive = moving;
+  if (!moving) precisionFollowTargetId = null;
+  syncTopFraming();
+  lensPositionDirty = true;
+}
+precisionRecenterButton.addEventListener('click', recenterPrecisionCamera);
 function movePrecisionCamera(dxWorld, dzWorld) {
   if (!precisionZoom || camera !== topCamera) return;
   precisionAnchor = panPrecisionFocus(precisionAnchor, dxWorld, dzWorld,
@@ -1136,6 +1167,13 @@ function movePrecisionCamera(dxWorld, dzWorld) {
   precisionFollowActive = false;
   syncTopFraming();
   lensPositionDirty = true;
+}
+function syncRecenterButton() {
+  // A contextual recovery control: only when the player deliberately moved
+  // the optical camera, never on a phone or when the white was potted.
+  const hide = !precisionZoom || camera !== topCamera || !precisionManualPan ||
+    !balls[0] || balls[0].pocketed;
+  if (precisionRecenterButton.hidden !== hide) precisionRecenterButton.hidden = hide;
 }
 function syncTopFraming() {
   const focus = precisionZoom ? precisionAnchor : { x: 0, z: 0 };
@@ -1167,6 +1205,7 @@ function syncTopFraming() {
     ? 'Zoom ' + precisionZoomLevel.toFixed(1).replace('.', ',') +
       '× · rueda acerca el punto bajo el cursor · tecla Z para salir'
     : 'Zoom de precisión de 1,4× a 2,2× · tecla Z';
+  syncRecenterButton();
 }
 function resize() {
   const rect = viewport.getBoundingClientRect();
@@ -1392,6 +1431,9 @@ function frame(now) {
     precisionFollowActive = false; // scratches never chase an invisible ball
   }
   wasMoving = nowMoving;
+  // A scratch can remove the white while the camera is manually offset.
+  // Hide its recovery control as soon as the actual physical ball vanishes.
+  syncRecenterButton();
   modePractice.disabled = nowMoving || charge.active;
   modeSolo.disabled = nowMoving || charge.active;
   // If the user starts another stroke while the prompt is open, move it out
