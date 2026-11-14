@@ -17,7 +17,7 @@ test('American pool balls have exactly one non-striped 8 and unique numbered var
 });
 
 test('tight orthographic framing magnifies the whole table without clipping its rails', () => {
-  assert.ok(TOP_CAMERA_FILL >= 0.95 && TOP_CAMERA_FILL <= 0.975,
+  assert.ok(TOP_CAMERA_FILL >= 0.98 && TOP_CAMERA_FILL <= 0.985,
     'the table should use almost the whole viewport but keep its six pockets in frame');
   const desktopWidth = 1198, desktopHeight = 424;
   const heightWorld = Math.max(2.51 / TOP_CAMERA_FILL,

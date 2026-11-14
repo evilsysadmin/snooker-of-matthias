@@ -4,6 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { chromium } from '@playwright/test';
 import { samplePngRGB, screenshotShowsFelt, readPngRgbRect } from './pngFeltProbe.mjs';
 import { TOP_CAMERA_FILL, PRECISION_ZOOM } from '../src/poolVisuals.js';
+import { TABLE } from '../src/physics.js';
 
 mkdirSync('artifacts', { recursive: true });
 const browser = await chromium.launch({
@@ -599,8 +600,10 @@ try {
   const wideHalfHeight = Math.max(2.51 / TOP_CAMERA_FILL,
     4.75 / (wideAspect * TOP_CAMERA_FILL));
   const wideTableWidth = 9.5 * wideLayout.viewport.height / (2 * wideHalfHeight);
-  assert.ok(wideTableWidth / wideLayout.windowWidth >= 0.68,
-    'wide landscape physical table should fill at least 68% of browser width');
+  assert.ok(wideTableWidth / wideLayout.windowWidth >= 0.70,
+    'wide landscape physical table should fill at least 70% of browser width');
+  assert.ok(2 * TABLE.ballRadius * wideTableWidth / 9.5 >= 28,
+    'real rendered ball diameter should be at least 28px at 1814x832');
   assert.ok(wideLayout.switcher.left >= (wideLayout.windowWidth + wideTableWidth) / 2,
     'the camera toggle must stay in the side gutter, off the playable table');
   // The real user's 1814x832 desktop: optical close-up must preserve the
@@ -609,10 +612,10 @@ try {
   const rackY = wideLayout.viewport.top + wideLayout.viewport.height / 2;
   await widePage.mouse.move(rackX, rackY);
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
-  const zoom = widePage.locator('#precision-zoom');
-  assert.equal(await zoom.isVisible(), true, 'wide desktop offers optical precision');
-  assert.equal(await widePage.locator('#precision-zoom-compact').isVisible(), false,
-    'panorama must not repeat the zoom button in the lower rail');
+  const zoom = widePage.locator('#precision-zoom-compact');
+  assert.equal(await zoom.isVisible(), true, 'wide desktop offers optical precision in the lower rail');
+  assert.equal(await widePage.locator('#precision-zoom').isVisible(), false,
+    'panorama must keep the camera selector clear of the larger pocket');
   assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'full');
   await zoom.click();
   assert.equal(await zoom.getAttribute('aria-pressed'), 'true');

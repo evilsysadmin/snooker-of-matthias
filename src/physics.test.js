@@ -83,7 +83,8 @@ test('corner pockets swallow objects and the cue ball without a wall rebound', (
 
 test('pool-size balls, head spot and rack remain inside table', () => {
   const visualBallRatio = (2 * TABLE.ballRadius / (2 * TABLE.halfZ)) / (57.15 / 1270);
-  assert.ok(visualBallRatio > 0.85 && visualBallRatio < 1.2);
+  assert.ok(visualBallRatio >= 1.04 && visualBallRatio < 1.2,
+    'enlarged balls keep plausible pool proportions and true collision radius');
   assert.ok(CUE_START.x < 0 && RACK_APEX.x > 0);
   assert.ok(Math.abs(CUE_START.x) < TABLE.halfX - TABLE.ballRadius);
   assert.ok(Math.abs(RACK_APEX.x) < TABLE.halfX - TABLE.ballRadius);
