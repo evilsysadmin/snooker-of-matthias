@@ -525,7 +525,7 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
    vertical pixels to enlarge the *real* orthographic table and every ball.
    Only the presentation changes; physical radii, aim and pockets do not. */
 @media (min-width: 1600px) and (min-height: 740px) {
-  #viewport { inset: 68px 0 79px; }
+  #viewport { inset: 62px 0 74px; }
   /* Solo progress belongs in the clear header band, never over a pocket. */
   #viewport[data-game-mode="solo"] { top: 108px; }
   .topbar { top: 8px; }
@@ -538,6 +538,8 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   .mode-switch { top: 5px; }
   /* In this width class, place the camera selector in the free side gutter. */
   .camera-switch { top: 76px; right: 12px; }
+  /* Smaller camera toggle stays in the side gutter even at 1600px. */
+  .camera-option { min-width: 60px; padding: 0 8px; }
   .table-label { display: none; }
   .solo-status { top: 66px; }
   .bottom-panel {
@@ -563,21 +565,9 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   .spin-disc { width: 25px; height: 25px; flex-basis: 25px; }
 }
 
-/* Progressive disclosure: only very wide screens have a gutter for an
-   optional close-up without hiding any pocket behind camera buttons. */
+/* Keep optional zoom in the lower HUD on every desktop width: a third
+   camera button would cover the larger table's upper-right pocket. */
 .precision-zoom { display: none; }
-@media (min-width: 1700px) and (min-height: 740px) and (min-aspect-ratio: 13/6) {
-  .precision-zoom {
-    display: block;
-    min-width: 106px;
-    color: #e6d2ac;
-    border-left: 1px solid #c4ab7755;
-  }
-  .precision-zoom[aria-pressed="true"] {
-    background: #345447;
-    color: #fff0c5;
-  }
-}
 
 /* Precision panning only changes camera orientation/position. Default mouse
    motion still aims; the drag gesture switches to a grabbing cursor. */
@@ -610,10 +600,6 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
     background: #34594e;
   }
 }
-@media (min-width: 1700px) and (min-height: 740px) and (min-aspect-ratio: 13/6) {
-  .precision-zoom-compact { display: none; }
-}
-
 /* Contextual recover-from-pan action. Never covers a pocket or adds a phone
    control; it appears only on the ordinary lower desktop control rail. */
 .precision-recenter { display: none; }
