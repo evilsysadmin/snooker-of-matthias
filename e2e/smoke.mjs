@@ -692,6 +692,20 @@ try {
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimBank === 'z');
   assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-rail'), 'z');
   assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-pocket'), '');
+  // A fully unpowered shot cannot rebound. Slider changes must update the
+  // existing guide without firing a shot or changing its first-contact rail.
+  await widePage.locator('#power').evaluate((input) => {
+    input.value = '0';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimBank === '');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-rail'), 'z');
+  await widePage.locator('#power').evaluate((input) => {
+    input.value = '55';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimBank === 'z');
+  assert.equal(await widePage.locator('#shots').innerText(), '00');
   await widePage.locator('#spin-cycle').click();
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimBank === '');
   assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-rail'), 'z',

@@ -1162,7 +1162,8 @@ function updateCue(now) {
     impactDot.visible = true;
     viewport.dataset.aimRail = preview.railAxis;
     if (precisionZoom && camera === topCamera && cueSpin === 0) {
-      const bounce = predictFirstRailBounce(balls, aim.x, aim.z);
+      const bounce = predictFirstRailBounce(
+        balls, aim.x, aim.z, 0.80, Number(powerInput.value) / 100);
       if (bounce) {
         bankGuide.geometry.setFromPoints([
           new THREE.Vector3(bounce.x, 0.096, bounce.z),

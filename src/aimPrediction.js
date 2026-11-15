@@ -1,4 +1,4 @@
-import { TABLE, POCKETS, POCKET_JAWS } from './physics.js';
+import { TABLE, POCKETS, POCKET_JAWS, cueStrikeSpeed } from './physics.js';
 
 // Returns where the white ball's CENTRE first reaches a stationary ball or a
 // cushion when travelling along the chosen direction. Pure geometry only:
@@ -85,14 +85,19 @@ export function predictFirstContact(balls, dx, dz) {
   return { x, z, distance, ballId, jawIndex, pocketIndex, railAxis };
 }
 
-// Deliberately short, first-rail-only *direction* preview, never a promised
-// second pot or a complete trajectory. The ideal neutral-ball rebound uses the
-// SAME restitution coefficients as stepPhysics. Stop before the next physical
-// ball/jaw/rail/pocket obstacle, and avoid claims at two-cushion corners.
-export function predictFirstRailBounce(balls, dx, dz, maxLength = 0.80) {
+// A short neutral-spin direction hint, not a promised second pot. Bound
+// reach by the SAME launch speed, cloth drag and cushion restitution as the
+// deterministic physics. At insufficient power the bank must not be shown.
+// Avoid two-cushion corners and stop before any subsequent obstacle.
+export function predictFirstRailBounce(balls, dx, dz, maxLength = 0.80, power = 1) {
   if (!Number.isFinite(maxLength) || maxLength <= 0 || maxLength > 2) return null;
   const first = predictFirstContact(balls, dx, dz);
   if (!first?.railAxis) return null;
+  const speed = cueStrikeSpeed(power);
+  const drag = TABLE.rollingDeceleration;
+  // From v² = v0² - 2*a*s, the ball must actually reach the first rail.
+  const beforeBankSquared = speed * speed - 2 * drag * first.distance;
+  if (beforeBankSquared <= 0) return null;
   const length = Math.hypot(dx, dz);
   const ux = dx / length, uz = dz / length;
   const rx = first.railAxis === 'x' ? -ux * TABLE.cushionRestitution : ux;
@@ -107,7 +112,13 @@ export function predictFirstRailBounce(balls, dx, dz, maxLength = 0.80) {
     x: first.x + nx * eps, z: first.z + nz * eps };
   const next = predictFirstContact(
     balls.map(b => b.id === 0 ? followCue : b), nx, nz);
-  const distance = Math.min(maxLength, Math.max(0, (next?.distance ?? maxLength) + eps - 0.004));
+  // Only the velocity normal to the cushion loses restitution on impact.
+  // Subtract a conservative distance margin for discrete 120 Hz stepping
+  // and the small low-speed cutoff, so the hint doesn't promise a marginal bank.
+  const postBankDistance = beforeBankSquared * reboundLength ** 2 / (2 * drag);
+  const distance = Math.min(maxLength,
+    Math.max(0, (next?.distance ?? maxLength) + eps - 0.004),
+    Math.max(0, postBankDistance - 0.04));
   if (distance < 0.10) return null;
   return { x: first.x, z: first.z,
     endX: first.x + nx * distance, endZ: first.z + nz * distance,
