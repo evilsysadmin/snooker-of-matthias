@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TABLE } from './physics.js';
-import { predictFirstContact } from './aimPrediction.js';
+import { TABLE, strikeCue, stepPhysics } from './physics.js';
+import { predictFirstContact, predictFirstRailBounce } from './aimPrediction.js';
 
 const cue = (x = 0, z = 0) => ({ id: 0, x, z, vx: 0, vz: 0, pocketed: false });
 const object = (id, x, z, pocketed = false) => ({ id, x, z, vx: 0, vz: 0, pocketed });
@@ -108,6 +108,65 @@ test('the aiming guide sees all four clean diagonal corner mouths with enlarged 
     assert.equal(preview.ballId, null);
     assert.equal(preview.jawIndex, null);
   }
+});
+
+test('straight rails, jaw grazes and open pockets remain mutually exclusive', () => {
+  for (const [x, z, dx, dz, axis] of [
+    [3.6, -0.6, 1, 0.2, 'x'],
+    [-3.6, -0.6, -1, 0.2, 'x'],
+    [-0.6, 1.5, 0.2, 1, 'z'],
+    [-0.6, -1.5, 0.2, -1, 'z'],
+  ]) {
+    const first = predictFirstContact([cue(x, z)], dx, dz);
+    assert.equal(first.railAxis, axis);
+    assert.equal(first.ballId, null);
+    assert.equal(first.jawIndex, null);
+    assert.equal(first.pocketIndex, null);
+    const bounce = predictFirstRailBounce([cue(x, z)], dx, dz);
+    assert.equal(bounce?.railAxis, axis);
+    assert.ok(Math.hypot(bounce.endX - bounce.x, bounce.endZ - bounce.z) <= 0.801);
+    if (axis === 'x') assert.ok((bounce.endX - bounce.x) * dx < 0);
+    if (axis === 'z') assert.ok((bounce.endZ - bounce.z) * dz < 0);
+    // Compare signs against the actual 120 Hz physics, NOT drawn pixels.
+    const moving = [cue(x, z)];
+    assert.equal(strikeCue(moving, dx, dz, 1), true);
+    let reversed = false;
+    for (let i = 0; i < 180; i++) {
+      stepPhysics(moving, 1 / 120);
+      const ball = moving[0];
+      if (axis === 'x' ? ball.vx * dx < 0 : ball.vz * dz < 0) {
+        reversed = true;
+        assert.ok((bounce.endX - bounce.x) * ball.vx > 0 ||
+          (bounce.endZ - bounce.z) * ball.vz > 0,
+        'indicated bank segment points along the real post-collision velocity');
+        break;
+      }
+    }
+    assert.equal(reversed, true, 'real cushion rebound must happen');
+  }
+  for (const [balls, dx, dz, expectedPocket, expectedJaw] of [
+    [[cue(0, 1.6)], 0, 1, 4, null],
+    [[cue(0.22, 1.6)], 0, 1, null, true],
+    [[cue(3.79, 1.55)], 0.54, 0.6, 5, null],
+  ]) {
+    const first = predictFirstContact(balls, dx, dz);
+    assert.equal(first.railAxis, null);
+    if (expectedPocket !== null) assert.equal(first.pocketIndex, expectedPocket);
+    if (expectedJaw) assert.notEqual(first.jawIndex, null);
+    assert.equal(predictFirstRailBounce(balls, dx, dz), null);
+  }
+});
+
+test('bank hint stops before another ball and never reports it as a second pot', () => {
+  const clear = predictFirstRailBounce([cue(3.6, 0)], 1, 0, 1.5);
+  const blocked = predictFirstRailBounce([cue(3.6, 0), object(7, 3.3, 0)], 1, 0, 1.5);
+  assert.equal(clear.railAxis, 'x');
+  assert.ok(blocked.endX > clear.endX + 0.2,
+    'rebound hint must stop before it would pass through the next object ball');
+  assert.equal(predictFirstContact([cue(3.6, 0), object(7, 3.3, 0)], 1, 0).ballId, null,
+    'a ball behind the cue must not affect the original outward shot');
+  assert.equal(predictFirstRailBounce([cue(3.6, 0)], 1, 0, Infinity), null);
+  assert.equal(predictFirstRailBounce([cue(3.6, 0)], 1, 0, -1), null);
 });
 
 test('invalid directions and scratched white yield no prediction', () => {

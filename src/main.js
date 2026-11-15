@@ -6,7 +6,7 @@ import './styles.css';
 import { createShotCharge } from './shotCharge.js';
 import { cueIdleGap, cueStrokePose, CUE_TIP_LOCAL_X } from './cueMotion.js';
 import { createCueStick } from './cueVisuals.js';
-import { predictFirstContact } from './aimPrediction.js';
+import { predictFirstContact, predictFirstRailBounce } from './aimPrediction.js';
 import { FINE_AIM_STEP_DEGREES, rotateAim } from './fineAim.js';
 import { resolveStrokePower } from './strokeInteraction.js';
 import { remainingObjectBalls } from './practiceRules.js';
@@ -482,6 +482,19 @@ const guide = new THREE.Line(
   new THREE.LineDashedMaterial({ color: 0xd4f6d9, dashSize: 0.13, gapSize: 0.12, transparent: true, opacity: 0.6 }),
 );
 scene.add(guide);
+// A restrained single-bank direction hint, visible ONLY in optical precision
+// mode for neutral spin. Never imply an exact second pot or a full bounce line.
+const bankGuide = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0.096, 0), new THREE.Vector3(0, 0.096, 0),
+  ]),
+  new THREE.LineDashedMaterial({
+    color: 0x91d9d0, dashSize: 0.085, gapSize: 0.115,
+    transparent: true, opacity: 0.60, depthWrite: false,
+  }),
+);
+bankGuide.visible = false;
+scene.add(bankGuide);
 // A translucent ghost-white ring marks the predicted cue-ball position at
 // first contact; a small gold dot marks the actual surface contact on cut shots.
 const ghostRing = new THREE.Mesh(
@@ -1058,6 +1071,7 @@ function updateCue(now) {
   viewport.dataset.precisionTarget = '';
   ghostRing.visible = false;
   impactDot.visible = false;
+  bankGuide.visible = false;
   placementGhost.visible = scratchPending && !ballsMoving(balls) && Boolean(placementCandidate);
   if (placementGhost.visible) {
     placementGhost.position.set(placementCandidate.x, TABLE.ballRadius + 0.052, placementCandidate.z);
@@ -1065,6 +1079,9 @@ function updateCue(now) {
   }
   viewport.dataset.aimTarget = '';
   viewport.dataset.aimJaw = '';
+  viewport.dataset.aimRail = '';
+  viewport.dataset.aimPocket = '';
+  viewport.dataset.aimBank = '';
   // Shot physics already starts in shoot(); the stick is pure presentation.
   // Three distinct beats: quick contact, restrained recoil, quiet recovery.
   viewport.dataset.cueCharge = charge.active ? 'active' : '';
@@ -1115,6 +1132,7 @@ function updateCue(now) {
     ghostRing.visible = true;
     // The contact lies halfway between the centres of two equal-radius balls,
     // not necessarily on the aim axis when playing a cut.
+    impactDot.material.color.setHex(0xf1c778);
     impactDot.position.set((preview.x + target.x) / 2, TABLE.ballRadius + 0.057,
       (preview.z + target.z) / 2);
     impactDot.visible = true;
@@ -1128,8 +1146,33 @@ function updateCue(now) {
       TABLE.ballRadius + 0.052,
       jaw.z + (preview.z - jaw.z) * share,
     );
+    impactDot.material.color.setHex(0xf1c778);
     impactDot.visible = true;
     viewport.dataset.aimJaw = String(preview.jawIndex);
+  } else if (preview.pocketIndex !== null) {
+    // Real capture-circle entry (before any jaw/rail collision), not a
+    // speculative ball path beyond the opening.
+    impactDot.material.color.setHex(0x9eebbd);
+    impactDot.position.set(preview.x, TABLE.ballRadius + 0.057, preview.z);
+    impactDot.visible = true;
+    viewport.dataset.aimPocket = String(preview.pocketIndex);
+  } else if (preview.railAxis) {
+    impactDot.material.color.setHex(0x91d9d0);
+    impactDot.position.set(preview.x, TABLE.ballRadius + 0.057, preview.z);
+    impactDot.visible = true;
+    viewport.dataset.aimRail = preview.railAxis;
+    if (precisionZoom && camera === topCamera && cueSpin === 0) {
+      const bounce = predictFirstRailBounce(balls, aim.x, aim.z);
+      if (bounce) {
+        bankGuide.geometry.setFromPoints([
+          new THREE.Vector3(bounce.x, 0.096, bounce.z),
+          new THREE.Vector3(bounce.endX, 0.096, bounce.endZ),
+        ]);
+        bankGuide.computeLineDistances();
+        bankGuide.visible = true;
+        viewport.dataset.aimBank = bounce.railAxis;
+      }
+    }
   }
 }
 

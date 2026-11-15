@@ -246,8 +246,35 @@ try {
       path: 'artifacts/snooker-' + config.name + '-jaw-guide.png', fullPage: true,
       animations: 'disabled',
     });
+    // Point to an unobstructed long rail: neither a pocket nor a jaw.
+    const railScreen = await page.locator('#viewport canvas').evaluate((canvas, fill) => {
+      const rect = canvas.getBoundingClientRect();
+      const aspect = rect.width / rect.height;
+      const portrait = rect.width <= 700 && rect.height > rect.width * 1.15;
+      const hw = portrait ? 2.51 : 4.75, hh = portrait ? 4.75 : 2.51;
+      const halfHeight = Math.max(hh / fill, hw / (aspect * fill));
+      const scale = rect.height / (2 * halfHeight);
+      const x = -2.4, z = 1.35;
+      return portrait
+        ? { x: rect.left + rect.width / 2 + z * scale,
+            y: rect.top + rect.height / 2 - x * scale }
+        : { x: rect.left + rect.width / 2 + x * scale,
+            y: rect.top + rect.height / 2 + z * scale };
+    }, TOP_CAMERA_FILL);
+    await page.mouse.move(railScreen.x, railScreen.y);
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimRail === 'z');
+    assert.equal(await page.locator('#viewport').getAttribute('data-aim-pocket'), '',
+      'bank entry must never be advertised as a clean pocket');
+    assert.equal(await page.locator('#viewport').getAttribute('data-aim-jaw'), '',
+      'a straight rail must not be advertised as a rounded jaw');
+    assert.equal(await page.locator('#viewport').getAttribute('data-aim-bank'), '',
+      'full-table mode stays uncluttered: one-bank line is precision-only');
+    assert.equal(await lens.isVisible(), false,
+      'a rail must not invent a first-hit object-ball magnifier');
     await page.mouse.move(rackScreen.x, rackScreen.y);
     await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
+    assert.equal(await page.locator('#viewport').getAttribute('data-aim-rail'), '',
+      'direct re-aiming clears the previous band marker');
     assert.equal(await page.locator('#viewport').getAttribute('data-aim-jaw'), '',
       'direct re-aiming clears the previous jaw highlight');
     if (config.isMobile) {

@@ -75,6 +75,41 @@ export function predictFirstContact(balls, dx, dz) {
     jawIndex = null;
     pocketIndex = index;
   }
-  return { x: cue.x + distance * ux, z: cue.z + distance * uz,
-    distance, ballId, jawIndex, pocketIndex };
+  const x = cue.x + distance * ux, z = cue.z + distance * uz;
+  // Report a real straight cushion only when it WON the first-contact race.
+  // A corner where two cushion planes coincide is ambiguous, not a bank hint.
+  const atX = Math.abs(Math.abs(x) - wallX) < 1e-7;
+  const atZ = Math.abs(Math.abs(z) - wallZ) < 1e-7;
+  const railAxis = ballId === null && jawIndex === null && pocketIndex === null
+    ? (atX !== atZ ? (atX ? 'x' : 'z') : null) : null;
+  return { x, z, distance, ballId, jawIndex, pocketIndex, railAxis };
+}
+
+// Deliberately short, first-rail-only *direction* preview, never a promised
+// second pot or a complete trajectory. The ideal neutral-ball rebound uses the
+// SAME restitution coefficients as stepPhysics. Stop before the next physical
+// ball/jaw/rail/pocket obstacle, and avoid claims at two-cushion corners.
+export function predictFirstRailBounce(balls, dx, dz, maxLength = 0.80) {
+  if (!Number.isFinite(maxLength) || maxLength <= 0 || maxLength > 2) return null;
+  const first = predictFirstContact(balls, dx, dz);
+  if (!first?.railAxis) return null;
+  const length = Math.hypot(dx, dz);
+  const ux = dx / length, uz = dz / length;
+  const rx = first.railAxis === 'x' ? -ux * TABLE.cushionRestitution : ux;
+  const rz = first.railAxis === 'z' ? -uz * TABLE.cushionRestitution : uz;
+  const reboundLength = Math.hypot(rx, rz);
+  if (reboundLength < 1e-9) return null;
+  const nx = rx / reboundLength, nz = rz / reboundLength;
+  // Start a hair inside the rail so the second ray does not immediately
+  // classify its starting point as another impact on that same rail.
+  const eps = 0.002;
+  const followCue = { ...balls.find(b => b.id === 0),
+    x: first.x + nx * eps, z: first.z + nz * eps };
+  const next = predictFirstContact(
+    balls.map(b => b.id === 0 ? followCue : b), nx, nz);
+  const distance = Math.min(maxLength, Math.max(0, (next?.distance ?? maxLength) + eps - 0.004));
+  if (distance < 0.10) return null;
+  return { x: first.x, z: first.z,
+    endX: first.x + nx * distance, endZ: first.z + nz * distance,
+    railAxis: first.railAxis };
 }
