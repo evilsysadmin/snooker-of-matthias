@@ -74,16 +74,22 @@ export function createVersionWatcher({
   onAvailable,
   isVisible = () => true,
   everyMs = 90_000,
+  // "Más tarde" means later: re-offer an uninstalled release at most once
+  // every 30 minutes, rather than silencing that SHA forever.
+  remindMs = 30 * 60_000,
+  now = () => Date.now(),
   repeat = setInterval,
   cancel = clearInterval,
 }) {
   if (typeof readRelease !== 'function' || typeof onAvailable !== 'function' ||
-      typeof isVisible !== 'function' || everyMs < 30_000 ||
+      typeof isVisible !== 'function' || !Number.isFinite(everyMs) || everyMs < 30_000 ||
+      !Number.isFinite(remindMs) || remindMs < everyMs || typeof now !== 'function' ||
       (sourceSha !== null && (typeof sourceSha !== 'string' || !SHA.test(sourceSha)))) {
     throw new TypeError('Invalid version watcher configuration');
   }
   let initial = sourceSha;
   let notified = null;
+  let notifiedAt = -Infinity;
   let inflight = false;
   let active = false;
   let timer = null;
@@ -97,8 +103,10 @@ export function createVersionWatcher({
       if (initial === null) {
         // Only for local/unversioned builds; production supplies sourceSha.
         initial = sha;
-      } else if (sha !== initial && sha !== notified) {
+      } else if (sha !== initial &&
+          (sha !== notified || now() - notifiedAt >= remindMs)) {
         notified = sha;
+        notifiedAt = now();
         onAvailable();
       }
     } catch {

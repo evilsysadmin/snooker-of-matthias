@@ -85,6 +85,63 @@ test('first release is baseline, then notify once per published SHA', async () =
   assert.deepEqual(notified, [B, C], 'stopped watcher is inert');
 });
 
+test('Más tarde re-offers the same stale release after 30 minutes, not every poll', async () => {
+  let tick = 10_000;
+  let sha = A;
+  let interval;
+  const notices = [];
+  const watcher = createVersionWatcher({
+    sourceSha: A,
+    readRelease: async () => sha,
+    onAvailable: () => notices.push(sha),
+    now: () => tick,
+    repeat: (fn, ms) => { assert.equal(ms, 90_000); interval = fn; return 12; },
+    cancel: (id) => assert.equal(id, 12),
+  });
+  watcher.start();
+  await watcher.check();
+  sha = B;
+  await interval();
+  assert.deepEqual(notices, [B], 'new SHA is immediately announced');
+  tick += 29 * 60_000;
+  await interval();
+  assert.deepEqual(notices, [B], 'dismissed version is not repeatedly announced during snooze');
+  tick += 60_000;
+  await interval();
+  assert.deepEqual(notices, [B, B], 'same uninstalled version gets another chance after 30 minutes');
+  sha = C;
+  await interval();
+  assert.deepEqual(notices, [B, B, C], 'genuinely newer release overrides previous reminder window');
+  tick += 60_000;
+  await interval();
+  assert.deepEqual(notices, [B, B, C], 'new release does not nag on every 90-second poll');
+  watcher.stop();
+});
+
+test('expired reminder waits for focus before reappearing', async () => {
+  let visible = true, tick = 0, sha = B;
+  let interval;
+  const notices = [];
+  const watcher = createVersionWatcher({
+    sourceSha: A, readRelease: async () => sha,
+    isVisible: () => visible,
+    now: () => tick,
+    onAvailable: () => notices.push(sha),
+    repeat: (fn) => { interval = fn; return 2; }, cancel: () => {},
+  });
+  watcher.start();
+  await watcher.check();
+  assert.deepEqual(notices, [B]);
+  visible = false;
+  tick = 31 * 60_000;
+  await interval();
+  assert.deepEqual(notices, [B], 'background tabs never generate reminders');
+  visible = true;
+  await watcher.check();
+  assert.deepEqual(notices, [B, B], 'returning to an outdated foreground tab prompts again');
+  watcher.stop();
+});
+
 test('no polling while hidden and denied/failed reads never show a banner', async () => {
   let hidden = false;
   let sha = A;
@@ -257,4 +314,18 @@ test('a signed-in client can recover from a denied first release read with its b
   await watcher.check();
   assert.deepEqual(notified, [B], 'first authenticated release check can still notify');
   watcher.stop();
+});
+
+test('invalid reminder intervals and clocks are rejected', () => {
+  for (const opts of [
+    { remindMs: 0 },
+    { remindMs: 10_000 },
+    { remindMs: Infinity },
+    { now: null },
+  ]) {
+    assert.throws(() => createVersionWatcher({
+      sourceSha: A, readRelease: async () => A,
+      onAvailable: () => {}, ...opts,
+    }), TypeError);
+  }
 });
