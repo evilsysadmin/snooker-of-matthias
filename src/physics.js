@@ -101,11 +101,18 @@ export function ballsMoving(balls) {
       (b.id === 0 && Math.hypot(b.spinVx || 0, b.spinVz || 0) > 0.01)));
 }
 
-// Share the exact initial impulse between real shots and optional aiming
-// assistance. In particular, 0% must NEVER imply a physically possible bank.
+// One launch-speed contract for the physical cue and the optical bank hint.
+// The old 2.7 m/s minimum jumped immediately at 1%: tiny touch shots could
+// roll metres. Smoothly fade in that floor over the first 30% of the slider;
+// from 30% upward, preserve the original power and break-shot behaviour.
+// Smoothstep has zero slope at both ends, so the gradient also joins cleanly.
 export function cueStrikeSpeed(power) {
-  const strength = Math.max(0, Math.min(1, Number(power) || 0));
-  return strength > 0 ? 2.7 + strength * 8.3 : 0;
+  const numeric = Number(power);
+  if (!Number.isFinite(numeric)) return 0;
+  const strength = Math.max(0, Math.min(1, numeric));
+  const t = Math.min(1, strength / 0.3);
+  const lowPowerLift = t * t * (3 - 2 * t);
+  return strength * 8.3 + lowPowerLift * 2.7;
 }
 
 export function strikeCue(balls, dx, dz, power, followDraw = 0) {

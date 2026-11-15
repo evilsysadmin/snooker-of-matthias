@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  TABLE, CUE_START, RACK_APEX, POCKETS, POCKET_JAWS, OBJECT_BALL_COUNT, createRack, ballsMoving, stepPhysics, strikeCue, respawnCue, canPlaceCueOnTable,
+  TABLE, CUE_START, RACK_APEX, POCKETS, POCKET_JAWS, OBJECT_BALL_COUNT, createRack, ballsMoving, stepPhysics, strikeCue, cueStrikeSpeed, respawnCue, canPlaceCueOnTable,
 } from './physics.js';
 
 test('American 8-ball has fifteen numbered balls and centred white without overlap', () => {
@@ -292,6 +292,35 @@ test('keyboard ball-in-hand fallback avoids occupied head spot', () => {
 
 test('physics rejects variable steps that would tunnel through collisions', () => {
   assert.throws(() => stepPhysics(createRack(), 0.5), RangeError);
+});
+
+test('1–30% soft strokes scale continuously, not from a sudden 2.7 m/s minimum', () => {
+  const levels = [0, 0.01, 0.05, 0.10, 0.20, 0.30, 0.55, 1];
+  const speeds = levels.map(cueStrikeSpeed);
+  assert.equal(speeds[0], 0);
+  assert.ok(speeds.every((speed, i) => i === 0 || speed > speeds[i - 1]),
+    'more power must always mean more initial ball speed');
+  assert.ok(speeds[1] < 0.15, 'a 1% stroke should be a genuine feather touch');
+  assert.ok(speeds[2] > 0.5 && speeds[2] < 1,
+    'a 5% stroke should make the white roll visibly but gently');
+  assert.ok(speeds[3] < 2, 'a 10% stroke must no longer launch at break speed');
+  for (const power of [0.3, 0.55, 1]) {
+    assert.ok(Math.abs(cueStrikeSpeed(power) - (2.7 + 8.3 * power)) < 1e-12,
+      'medium and full break power must keep the familiar launch speed');
+  }
+  assert.ok(Math.abs(cueStrikeSpeed(0.3 - 1e-7) - cueStrikeSpeed(0.3 + 1e-7)) < 0.000005,
+    'low-power blend must not introduce a jump near 30%');
+  for (const invalid of [NaN, Infinity, -Infinity, undefined]) {
+    assert.equal(cueStrikeSpeed(invalid), 0);
+  }
+  assert.equal(cueStrikeSpeed(-2), 0);
+  assert.equal(cueStrikeSpeed(5), 11);
+  const gentle = [{ id: 0, x: 0, z: 0, vx: 0, vz: 0, pocketed: false }];
+  assert.equal(strikeCue(gentle, 1, 0, 0.05), true);
+  for (let i = 0; i < 400; i++) stepPhysics(gentle, 1 / 120);
+  assert.ok(gentle[0].x > 0.07 && gentle[0].x < 0.3,
+    'the physical 5% cue rolls a few ball radii, not several metres');
+  assert.equal(gentle[0].vx, 0);
 });
 
 test('zero charge does not produce a shot or move the cue', () => {
