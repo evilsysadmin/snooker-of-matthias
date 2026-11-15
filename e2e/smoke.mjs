@@ -513,8 +513,9 @@ try {
     assert.equal(await page.locator('#viewport').getAttribute('data-game-mode'), 'solo');
     assert.equal(await page.locator('#shots').innerText(), '00', 'switching modes reracks cleanly');
 
-    // A gentle real stroke stays short of the distant rack and gives a
-    // deterministic miss. It must count as one actual solo shot, never a pot.
+    // A real 5% feather touch should still count as one shot and a miss.
+    // The initial impulse is now scaled smoothly rather than jumping to
+    // 2.7 m/s at the lowest nonzero setting.
     await page.locator('#power').evaluate((input) => {
       input.value = '5';
       input.dispatchEvent(new Event('input', { bubbles: true }));

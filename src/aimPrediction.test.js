@@ -183,9 +183,11 @@ test('bank hint respects actual selected power and shared cloth drag', () => {
   for (let i = 0; i < 1300; i++) stepPhysics(low, 1 / 120);
   assert.ok(low[0].x < railX - 0.8 && low[0].vx === 0,
     'real low-power ball stops far before the cushion, without rebounding');
-  const bank = predictFirstRailBounce(far, 1, 0, 0.8, 0.2);
+  const bank = predictFirstRailBounce(far, 1, 0, 0.8, 0.25);
   assert.ok(bank?.endX < bank.x, 'sufficient power permits a real bank');
-  const partial = predictFirstRailBounce(far, 1, 0, 0.8, 0.14);
+  assert.equal(predictFirstRailBounce(far, 1, 0, 0.8, 0.14), null,
+    'the gentler 14% stroke stops before the far rail');
+  const partial = predictFirstRailBounce(far, 1, 0, 0.8, 0.21);
   assert.ok(partial && Math.hypot(partial.endX - partial.x, partial.endZ - partial.z) < 0.8,
     'modest remaining energy reduces the rebound hint length');
   const fast = predictFirstRailBounce(far, 1, 0, 0.8, 1);
