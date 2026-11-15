@@ -591,9 +591,13 @@ try {
       windowWidth: window.innerWidth };
   });
   assert.ok(wideLayout.viewport.top >= wideLayout.header.bottom - 1,
-    'wide tabletop must remain below the full header');
+    'wide tabletop must remain below the full header: ' + JSON.stringify({
+      tableTop: wideLayout.viewport.top, headerBottom: wideLayout.header.bottom,
+    }));
   assert.ok(wideLayout.viewport.bottom <= wideLayout.controls.top + 1,
-    'wide tabletop must not hide behind the lower control rail');
+    'wide tabletop must not hide behind the lower control rail: ' + JSON.stringify({
+      tableBottom: wideLayout.viewport.bottom, controlsTop: wideLayout.controls.top,
+    }));
   assert.ok(wideLayout.viewport.height >= 680,
     'wide landscape should reclaim vertical room instead of tiny balls');
   const wideAspect = wideLayout.viewport.width / wideLayout.viewport.height;
