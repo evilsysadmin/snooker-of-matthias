@@ -367,6 +367,34 @@ try {
       'cancelled pull-back never sends a hidden impulse');
     if (config.isMobile) assert.equal(await page.locator('#fine-angle').innerText(), '0,0°',
       'restart resets the fine-aim adjustment');
+    // A quick Space tap must match a quick mouse/touch tap: selected slider
+    // power, not the tiny charge accumulated in a single keyboard event.
+    await page.locator('#power').evaluate((input) => {
+      input.value = '68';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.keyboard.press('Space');
+    await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '01');
+    assert.equal(await page.locator('#power-value').innerText(), '68%',
+      'quick keyboard Space uses selected slider power');
+    await page.locator('#restart').click();
+    await page.waitForFunction(() => document.querySelector('#shots')?.textContent === '00');
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.cueLocator === 'ready');
+    // Escape cancels a charged keyboard stroke without firing; the original
+    // preset is restored even after the live charge meter has changed.
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.keyboard.down('Space');
+    await page.waitForFunction(() => document.querySelector('#strike')?.classList.contains('charging') &&
+      Number(document.querySelector('#power')?.value) >= 25);
+    await page.keyboard.press('Escape');
+    await page.keyboard.up('Space');
+    assert.equal(await page.locator('#shots').innerText(), '00',
+      'Escape must not shoot an armed keyboard stroke');
+    assert.equal(await page.locator('#power-value').innerText(), '68%',
+      'Escape restores the selected power');
+    assert.equal(await page.locator('#strike').evaluate((el) => el.classList.contains('charging')),
+      false, 'cancelled keyboard hold leaves no charged button');
     // Blur the reset button so Space exercises gameplay charge, not native button activation.
     await page.evaluate(() => document.activeElement?.blur());
     await page.keyboard.down('Space');

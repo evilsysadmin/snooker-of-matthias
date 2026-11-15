@@ -9,6 +9,17 @@ test('a tap uses the selected slider power instead of an accidentally tiny charg
   assert.equal(resolveStrokePower(TAP_THRESHOLD_MS, 0.73, 0.15), 0.15);
 });
 
+test('keyboard and pointer taps share the same selected power even after a brief charge', () => {
+  const charge = createShotCharge();
+  const preset = 0.68;
+  charge.start(1_000);
+  const held = 75;
+  const charged = charge.release(1_000 + held);
+  assert.ok(charged < 0.1, 'raw SPACE charge used to make quick taps practically invisible');
+  assert.equal(resolveStrokePower(held, preset, charged), preset);
+  assert.equal(charge.active, false);
+});
+
 test('holding the strike button matches the deterministic SPACE charge curve', () => {
   const charge = createShotCharge();
   charge.start(100);
