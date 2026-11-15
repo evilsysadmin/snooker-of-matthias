@@ -10,9 +10,9 @@ export const BALL_COLORS = Object.freeze([
 // marker and a fine felt-level cue-selection ring that disappears in motion.
 // Maximise the entire six-pocket tabletop, not the physical size of the balls.
 // Old 0.89 hid a wide unused band around the table, especially on short
-// laptops. Keep a 1.8% safety margin on the limiting axis so all six pockets
+// laptops. Keep a 1.2% safety margin on the limiting axis so all six pockets
 // and rails remain visible. Actual balls/collisions share the physics radius.
-export const TOP_CAMERA_FILL = 0.982;
+export const TOP_CAMERA_FILL = 0.988;
 // Optical-only precision aid: ball physics and pocket sizes are unchanged.
 export const PRECISION_ZOOM = 1.4;
 export const MIN_PRECISION_ZOOM = 1.2;

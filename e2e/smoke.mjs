@@ -600,10 +600,10 @@ try {
   const wideHalfHeight = Math.max(2.51 / TOP_CAMERA_FILL,
     4.75 / (wideAspect * TOP_CAMERA_FILL));
   const wideTableWidth = 9.5 * wideLayout.viewport.height / (2 * wideHalfHeight);
-  assert.ok(wideTableWidth / wideLayout.windowWidth >= 0.70,
-    'wide landscape physical table should fill at least 70% of browser width');
-  assert.ok(2 * TABLE.ballRadius * wideTableWidth / 9.5 >= 28,
-    'real rendered ball diameter should be at least 28px at 1814x832');
+  assert.ok(wideTableWidth / wideLayout.windowWidth >= 0.72,
+    'wide landscape physical table should fill at least 72% of browser width');
+  assert.ok(2 * TABLE.ballRadius * wideTableWidth / 9.5 >= 30,
+    'real rendered ball diameter should be at least 30px at 1814x832');
   assert.ok(wideLayout.switcher.left >= (wideLayout.windowWidth + wideTableWidth) / 2,
     'the camera toggle must stay in the side gutter, off the playable table');
   // The real user's 1814x832 desktop: optical close-up must preserve the

@@ -523,9 +523,9 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
 /* Wide, medium-height desktops (e.g. 1814 x 832): the table was limited by
    a tall top chrome and a tall bottom rail, not by the monitor width. Reclaim
    vertical pixels to enlarge the *real* orthographic table and every ball.
-   Only the presentation changes; physical radii, aim and pockets do not. */
+   Keep the canvas clear of header and HUD; radius/aim share one world model. */
 @media (min-width: 1600px) and (min-height: 740px) {
-  #viewport { inset: 62px 0 74px; }
+  #viewport { inset: 58px 0 70px; }
   /* Solo progress belongs in the clear header band, never over a pocket. */
   #viewport[data-game-mode="solo"] { top: 108px; }
   .topbar { top: 8px; }
