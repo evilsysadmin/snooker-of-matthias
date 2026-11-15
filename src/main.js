@@ -544,6 +544,7 @@ let dirtyHUD = true;
 let fineAimSteps = 0;
 let cueSpin = 0; // -1: draw, 0: centre, +1: follow
 let pointerStroke = null;
+let keyboardStroke = null;
 let strokeAnimation = null;
 let mode = 'practice'; // Solo challenge is opt-in; free practice stays the default.
 let solo = newSoloChallenge(readSoloBest());
@@ -802,13 +803,22 @@ powerInput.addEventListener('input', () => paintPower(Number(powerInput.value)))
 paintPower(Number(powerInput.value));
 
 function cancelCharge() {
+  // A cancelled Space hold must restore the original slider, just like
+  // a pointer drag released outside the strike button.
   if (pointerStroke) paintPower(pointerStroke.preset * 100);
+  else if (keyboardStroke) paintPower(keyboardStroke.preset * 100);
   pointerStroke = null;
+  keyboardStroke = null;
   charge.cancel();
   powerInput.classList.remove('charging');
   strikeButton.classList.remove('charging');
 }
 window.addEventListener('keydown', (event) => {
+  if (event.code === 'Escape' && charge.active) {
+    event.preventDefault();
+    cancelCharge();
+    return;
+  }
   // Keep native Space activation for focused buttons/sliders (including camera controls).
   if (event.target instanceof HTMLButtonElement || event.target instanceof HTMLInputElement ||
       event.altKey || event.ctrlKey || event.metaKey) return;
@@ -851,7 +861,9 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'Space') {
     event.preventDefault();
     if (!event.repeat && !ballsMoving(balls) && !balls[0].pocketed) {
-      if (charge.start(performance.now())) {
+      const now = performance.now();
+      if (charge.start(now)) {
+        keyboardStroke = { started: now, preset: Number(powerInput.value) / 100 };
         powerInput.classList.add('charging');
         strikeButton.classList.add('charging');
       }
@@ -866,9 +878,15 @@ window.addEventListener('keydown', (event) => {
   if (!event.repeat && event.key.toLowerCase() === 'r') restart();
 });
 window.addEventListener('keyup', (event) => {
-  if (event.code !== 'Space' || !charge.active || pointerStroke) return;
+  if (event.code !== 'Space' || !charge.active || pointerStroke || !keyboardStroke) return;
   event.preventDefault();
-  const power = charge.release(performance.now());
+  const held = keyboardStroke;
+  keyboardStroke = null;
+  const now = performance.now();
+  const charged = charge.release(now);
+  // A quick keyboard tap and a quick touch/click are equivalent. A deliberate
+  // hold still follows the same live triangle-wave charge.
+  const power = resolveStrokePower(now - held.started, held.preset, charged);
   powerInput.classList.remove('charging');
   strikeButton.classList.remove('charging');
   paintPower(power * 100);
