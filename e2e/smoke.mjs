@@ -219,6 +219,13 @@ try {
     } else {
       assert.equal(await lens.isVisible(), false, 'desktop keeps its uncluttered table');
     }
+    // The spin-selection smoke above deliberately left follow enabled.
+    // Switch to NEUTRAL before checking neutral-only stopping-distance logic;
+    // restore follow afterwards so later spin/game contracts are unchanged.
+    assert.equal(await spinControl.getAttribute('data-spin'), '1');
+    await selectSpin(); // Follow -> Draw
+    await selectSpin(); // Draw -> Centre
+    assert.equal(await spinControl.getAttribute('data-spin'), '0');
     // A 5% neutral stroke cannot reach the distant rack. Its guide should
     // stop nearby, without a false first-hit target or a misleading mobile lens.
     await page.locator('#power').evaluate((input) => {
@@ -243,6 +250,8 @@ try {
     if (config.isMobile) await lens.waitFor({ state: 'visible' });
     assert.equal(await page.locator('#shots').innerText(), '00',
       'power-only preview must not fire a shot');
+    await selectSpin(); // Centre -> Follow, preserve prior input state
+    assert.equal(await spinControl.getAttribute('data-spin'), '1');
     // The actual opening rack offers a clear line towards the upper-left
     // corner's long-rail jaw. The guide must now identify that physical jaw.
     const jawScreen = await page.locator('#viewport canvas').evaluate((canvas, fill) => {

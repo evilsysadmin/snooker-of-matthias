@@ -1122,7 +1122,12 @@ function updateCue(now) {
     : predictFirstContact(balls, aim.x, aim.z);
   if (!preview) { guide.visible = false; syncTargetLens(null); return; }
   syncTargetLens(preview.ballId);
-  const start = Math.min(preview.distance, TABLE.ballRadius * 1.2);
+  // The ordinary guide starts just beyond the white. For a short-stop
+  // preview, that old offset can exceed the entire travel and collapse both
+  // vertices onto the same point. Keep a genuine cue-to-stop segment instead.
+  const start = preview.stopsShort
+    ? Math.min(TABLE.ballRadius * 0.5, preview.distance * 0.25)
+    : Math.min(preview.distance, TABLE.ballRadius * 1.2);
   const front = new THREE.Vector3(cue.x + aim.x * start, 0.095, cue.z + aim.z * start);
   const end = new THREE.Vector3(preview.x, 0.095, preview.z);
   guide.visible = !preview.stopsShort || preview.distance >= 0.045;
