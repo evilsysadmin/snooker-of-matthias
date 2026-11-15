@@ -219,6 +219,30 @@ try {
     } else {
       assert.equal(await lens.isVisible(), false, 'desktop keeps its uncluttered table');
     }
+    // A 5% neutral stroke cannot reach the distant rack. Its guide should
+    // stop nearby, without a false first-hit target or a misleading mobile lens.
+    await page.locator('#power').evaluate((input) => {
+      input.value = '5';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.waitForFunction(() => Number(document.querySelector('#viewport')?.dataset.aimStop) > 0);
+    const stopDistance = Number(await page.locator('#viewport').getAttribute('data-aim-stop'));
+    assert.ok(stopDistance > 0.045 && stopDistance < 0.2,
+      'soft-shot marker must be near the cue, not at the distant rack');
+    assert.equal(await page.locator('#viewport').getAttribute('data-aim-target'), '',
+      'do not claim a first-ball hit when the cue stops short');
+    assert.equal(await lens.isVisible(), false,
+      'mobile magnifier must hide when power cannot reach the target');
+    await page.locator('#power').evaluate((input) => {
+      input.value = '55';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
+    assert.equal(await page.locator('#viewport').getAttribute('data-aim-stop'), '',
+      'restoring normal power must clear the short-stop hint');
+    if (config.isMobile) await lens.waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#shots').innerText(), '00',
+      'power-only preview must not fire a shot');
     // The actual opening rack offers a clear line towards the upper-left
     // corner's long-rail jaw. The guide must now identify that physical jaw.
     const jawScreen = await page.locator('#viewport canvas').evaluate((canvas, fill) => {
