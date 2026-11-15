@@ -598,16 +598,16 @@ try {
     'wide tabletop must not hide behind the lower control rail: ' + JSON.stringify({
       tableBottom: wideLayout.viewport.bottom, controlsTop: wideLayout.controls.top,
     }));
-  assert.ok(wideLayout.viewport.height >= 680,
-    'wide landscape should reclaim vertical room instead of tiny balls');
+  assert.ok(wideLayout.viewport.height >= 730,
+    'wide landscape should reserve 730px for the real WebGL table');
   const wideAspect = wideLayout.viewport.width / wideLayout.viewport.height;
   const wideHalfHeight = Math.max(2.51 / TOP_CAMERA_FILL,
     4.75 / (wideAspect * TOP_CAMERA_FILL));
   const wideTableWidth = 9.5 * wideLayout.viewport.height / (2 * wideHalfHeight);
-  assert.ok(wideTableWidth / wideLayout.windowWidth >= 0.72,
-    'wide landscape physical table should fill at least 72% of browser width');
-  assert.ok(2 * TABLE.ballRadius * wideTableWidth / 9.5 >= 30,
-    'real rendered ball diameter should be at least 30px at 1814x832');
+  assert.ok(wideTableWidth / wideLayout.windowWidth >= 0.75,
+    'wide landscape physical table should fill at least 75% of browser width');
+  assert.ok(2 * TABLE.ballRadius * wideTableWidth / 9.5 >= 33,
+    'real rendered ball diameter should be at least 33px at 1814x832');
   assert.ok(wideLayout.switcher.left >= (wideLayout.windowWidth + wideTableWidth) / 2,
     'the camera toggle must stay in the side gutter, off the playable table');
   // The real user's 1814x832 desktop: optical close-up must preserve the

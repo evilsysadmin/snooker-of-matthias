@@ -6,7 +6,7 @@ export const TABLE = Object.freeze({
   // Approximate American pool ball/table proportions, while keeping the
   // balls legible on phone-sized 3D canvases. Radius is shared by the
   // renderer, rack, collision solver and aiming geometry: no fake sprite scale.
-  ballRadius: 0.112,
+  ballRadius: 0.116,
   // Capture radii match the visible mouths. Middle pockets are a little more
   // forgiving; these are tuned game approximations, not WPBSA pocket templates.
   pocketRadius: 0.175,
