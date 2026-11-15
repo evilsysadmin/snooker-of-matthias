@@ -525,7 +525,7 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
    vertical pixels to enlarge the *real* orthographic table and every ball.
    Keep the canvas clear of header and HUD; radius/aim share one world model. */
 @media (min-width: 1600px) and (min-height: 740px) {
-  #viewport { inset: 42px 0 58px; }
+  #viewport { inset: 42px 0 59px; }
   /* Solo progress belongs in the clear header band, never over a pocket. */
   #viewport[data-game-mode="solo"] { top: 108px; }
   /* Compact header stays above the real y=42px playfield. */
@@ -549,7 +549,8 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   .solo-status { top: 66px; }
   .bottom-panel {
     min-height: 0;
-    bottom: max(6px, env(safe-area-inset-bottom));
+    /* Dock flush at screen edge so its 58px never covers the table. */
+    bottom: 0;
     padding: 1px 12px;
   }
   .commentary { min-width: 0; }
