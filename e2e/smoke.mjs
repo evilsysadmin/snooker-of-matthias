@@ -682,6 +682,25 @@ try {
   assert.equal(await zoom.getAttribute('aria-pressed'), 'true');
   assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'precision');
   assert.equal(await widePage.locator('#shots').innerText(), '00');
+  // Probe a real open stretch of the long rail while optical zoom is active.
+  // A short neutral-spin rebound hint appears; changing spin removes it,
+  // without re-aiming, changing the zoom, or triggering a shot.
+  const scale = wideTableWidth / 9.5 * PRECISION_ZOOM;
+  const bankProbeX = wideLayout.windowWidth / 2 + (-2.4 + 0.175) * scale;
+  const bankProbeY = wideLayout.viewport.top + wideLayout.viewport.height / 2 + 1.2 * scale;
+  await widePage.mouse.move(bankProbeX, bankProbeY);
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimBank === 'z');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-rail'), 'z');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-pocket'), '');
+  await widePage.locator('#spin-cycle').click();
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimBank === '');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-rail'), 'z',
+    'spin does not change the first physical rail being aimed at');
+  await widePage.locator('#spin-cycle').click();
+  await widePage.locator('#spin-cycle').click();
+  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimBank === 'z');
+  assert.equal(await widePage.locator('#shots').innerText(), '00',
+    'bank hint and spin preview never fire an actual shot');
   const closeRackX = wideLayout.windowWidth / 2 +
     (2.05 + 0.175) * (wideTableWidth / 9.5) * PRECISION_ZOOM;
   await widePage.mouse.move(closeRackX, rackY);
