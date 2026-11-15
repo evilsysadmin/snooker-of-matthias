@@ -566,6 +566,9 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   }
   .shot-controls { align-items: center; }
   .power { padding-bottom: 0; }
+  /* Its value (Centro/Follow/Draw) stays visible and its aria-label stays
+     complete; the redundant caption cost 10px and overlapped the table. */
+  .spin-title { display: none; }
   .spin-cycle { min-height: 46px; padding: 1px 6px; }
   .spin-disc { width: 25px; height: 25px; flex-basis: 25px; }
 }

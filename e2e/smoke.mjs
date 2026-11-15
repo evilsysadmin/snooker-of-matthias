@@ -598,6 +598,8 @@ try {
     'wide tabletop must not hide behind the lower control rail: ' + JSON.stringify({
       tableBottom: wideLayout.viewport.bottom, controlsTop: wideLayout.controls.top,
     }));
+  assert.equal(await widePage.locator('.spin-title').isVisible(), false,
+    'redundant desktop spin caption must not steal space from the full table');
   assert.ok(wideLayout.viewport.height >= 730,
     'wide landscape should reserve 730px for the real WebGL table');
   const wideAspect = wideLayout.viewport.width / wideLayout.viewport.height;
