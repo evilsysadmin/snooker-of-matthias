@@ -158,12 +158,13 @@ test('every pocket has two mirrored rounded jaws inside the playable table', () 
 });
 
 test('a clean diagonal shot can enter each of the four corner mouths', () => {
-  // Previously every such trajectory struck a jaw before pocket capture.
+  // Keep the genuinely clear 48-degree opening aligned with the aim predictor.
+  // A shallower shot can clip a jaw when the physical ball radius increases.
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    const dx = 4.33 - 3.75, dz = 2.15 - 1.55;
+    const dx = 4.33 - 3.79, dz = 2.15 - 1.55;
     const length = Math.hypot(dx, dz);
     const ball = {
-      id: 1, x: sx * 3.75, z: sz * 1.55,
+      id: 1, x: sx * 3.79, z: sz * 1.55,
       vx: sx * 3 * dx / length, vz: sz * 3 * dz / length,
       pocketed: false,
     };
