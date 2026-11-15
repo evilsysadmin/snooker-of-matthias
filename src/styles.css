@@ -525,18 +525,22 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
    vertical pixels to enlarge the *real* orthographic table and every ball.
    Keep the canvas clear of header and HUD; radius/aim share one world model. */
 @media (min-width: 1600px) and (min-height: 740px) {
-  #viewport { inset: 58px 0 70px; }
+  #viewport { inset: 42px 0 59px; }
   /* Solo progress belongs in the clear header band, never over a pocket. */
   #viewport[data-game-mode="solo"] { top: 108px; }
-  /* Preserve a clean header gap when the 1814px tabletop starts at y=58px. */
-  .topbar { top: 4px; }
-  .brand { gap: 10px; }
-  .brand-icon { width: 36px; height: 36px; font-size: 22px; }
-  .brand-copy small { font-size: 8px; margin-bottom: 2px; }
-  .brand-copy strong { font-size: clamp(18px, 1.1vw, 21px); }
-  .scoreboard { padding: 4px 12px; }
-  .scoreboard strong { font-size: 22px; }
-  .mode-switch { top: 5px; }
+  /* Compact header stays above the real y=42px playfield. */
+  .topbar { top: 2px; }
+  .brand { gap: 8px; }
+  .brand-icon { width: 30px; height: 30px; font-size: 18px; }
+  .brand-copy small { font-size: 7px; margin-bottom: 1px; }
+  .brand-copy strong { font-size: clamp(17px, 1.05vw, 20px); }
+  .scoreboard { padding: 2px 10px; gap: 14px; }
+  .scoreboard div:not(.score-divider) { gap: 2px; }
+  .scoreboard span { font-size: 8px; }
+  .scoreboard strong { font-size: 18px; }
+  .score-divider { height: 23px; }
+  .mode-switch { top: 2px; padding: 2px; }
+  .mode-switch button { min-height: 30px; padding: 0 9px; font-size: 10px; }
   /* In this width class, place the camera selector in the free side gutter. */
   .camera-switch { top: 76px; right: 12px; }
   /* Smaller camera toggle stays in the side gutter even at 1600px. */
@@ -545,8 +549,9 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   .solo-status { top: 66px; }
   .bottom-panel {
     min-height: 0;
-    bottom: max(8px, env(safe-area-inset-bottom));
-    padding: 3px 14px;
+    /* Dock flush at screen edge so its 58px never covers the table. */
+    bottom: 0;
+    padding: 1px 12px;
   }
   .commentary { min-width: 0; }
   .monogram { width: 30px; height: 30px; flex-basis: 30px; font-size: 21px; }
@@ -562,7 +567,10 @@ kbd { font: 700 9px 'DM Sans',sans-serif; border: 1px solid #332c2148; border-ra
   }
   .shot-controls { align-items: center; }
   .power { padding-bottom: 0; }
-  .spin-cycle { min-height: 52px; padding: 3px 6px; }
+  /* Its value (Centro/Follow/Draw) stays visible and its aria-label stays
+     complete; the redundant caption cost 10px and overlapped the table. */
+  .spin-title { display: none; }
+  .spin-cycle { min-height: 46px; padding: 1px 6px; }
   .spin-disc { width: 25px; height: 25px; flex-basis: 25px; }
 }
 
