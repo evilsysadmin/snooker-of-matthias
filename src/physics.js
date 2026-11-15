@@ -101,13 +101,19 @@ export function ballsMoving(balls) {
       (b.id === 0 && Math.hypot(b.spinVx || 0, b.spinVz || 0) > 0.01)));
 }
 
+// Share the exact initial impulse between real shots and optional aiming
+// assistance. In particular, 0% must NEVER imply a physically possible bank.
+export function cueStrikeSpeed(power) {
+  const strength = Math.max(0, Math.min(1, Number(power) || 0));
+  return strength > 0 ? 2.7 + strength * 8.3 : 0;
+}
+
 export function strikeCue(balls, dx, dz, power, followDraw = 0) {
   const cue = balls.find((ball) => ball.id === 0);
   const length = Math.hypot(dx, dz);
   if (!cue || cue.pocketed || ballsMoving(balls) || length < 0.0001) return false;
-  const strength = Math.max(0, Math.min(1, Number(power) || 0));
-  if (strength === 0) return false;
-  const speed = 2.7 + strength * 8.3;
+  const speed = cueStrikeSpeed(power);
+  if (speed === 0) return false;
   cue.vx = dx / length * speed;
   cue.vz = dz / length * speed;
   // Retained forward/backward rolling motion couples into the cue velocity

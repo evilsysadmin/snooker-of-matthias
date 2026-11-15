@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TABLE, strikeCue, stepPhysics } from './physics.js';
+import { TABLE, cueStrikeSpeed, strikeCue, stepPhysics } from './physics.js';
 import { predictFirstContact, predictFirstRailBounce } from './aimPrediction.js';
 
 const cue = (x = 0, z = 0) => ({ id: 0, x, z, vx: 0, vz: 0, pocketed: false });
@@ -167,6 +167,31 @@ test('bank hint stops before another ball and never reports it as a second pot',
     'a ball behind the cue must not affect the original outward shot');
   assert.equal(predictFirstRailBounce([cue(3.6, 0)], 1, 0, Infinity), null);
   assert.equal(predictFirstRailBounce([cue(3.6, 0)], 1, 0, -1), null);
+});
+
+test('bank hint respects actual selected power and shared cloth drag', () => {
+  const far = [cue(0, 0)], railX = TABLE.halfX - TABLE.ballRadius;
+  const first = predictFirstContact(far, 1, 0);
+  assert.equal(first.railAxis, 'x');
+  assert.ok(Math.abs(first.distance - railX) < 1e-9);
+  assert.equal(cueStrikeSpeed(0), 0);
+  assert.equal(predictFirstRailBounce(far, 1, 0, 0.8, 0), null);
+  assert.equal(predictFirstRailBounce(far, 1, 0, 0.8, 0.01), null,
+    'a genuinely weak positive stroke cannot travel across half the table');
+  const low = [cue(0, 0)];
+  assert.equal(strikeCue(low, 1, 0, 0.01), true);
+  for (let i = 0; i < 1300; i++) stepPhysics(low, 1 / 120);
+  assert.ok(low[0].x < railX - 0.8 && low[0].vx === 0,
+    'real low-power ball stops far before the cushion, without rebounding');
+  const bank = predictFirstRailBounce(far, 1, 0, 0.8, 0.2);
+  assert.ok(bank?.endX < bank.x, 'sufficient power permits a real bank');
+  const partial = predictFirstRailBounce(far, 1, 0, 0.8, 0.14);
+  assert.ok(partial && Math.hypot(partial.endX - partial.x, partial.endZ - partial.z) < 0.8,
+    'modest remaining energy reduces the rebound hint length');
+  const fast = predictFirstRailBounce(far, 1, 0, 0.8, 1);
+  assert.ok(fast && Math.hypot(fast.endX - fast.x, fast.endZ - fast.z) > 0.79);
+  assert.equal(predictFirstRailBounce(far, 1, 0, 0.8, NaN), null);
+  assert.equal(predictFirstRailBounce(far, 1, 0, 0.8, -1), null);
 });
 
 test('invalid directions and scratched white yield no prediction', () => {
