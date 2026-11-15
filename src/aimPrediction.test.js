@@ -97,10 +97,12 @@ test('a grazing approach keeps the jaw/cushion prediction instead of claiming a 
   assert.ok(Math.abs(miss.z - (TABLE.halfZ - TABLE.ballRadius)) < 1e-9);
 });
 
-test('the aiming guide sees all four newly accessible diagonal corner mouths', () => {
+test('the aiming guide sees all four clean diagonal corner mouths with enlarged balls', () => {
+  // 48-degree entry clears both jaw colliders with the shared 0.112m ball radius.
+  // The old 46-degree example now grazes a jaw: don't pretend it is a clean pot.
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    const preview = predictFirstContact([cue(sx * 3.75, sz * 1.55)],
-      sx * 0.58, sz * 0.60);
+    const preview = predictFirstContact([cue(sx * 3.79, sz * 1.55)],
+      sx * 0.54, sz * 0.60);
     const pocket = sx < 0 ? (sz < 0 ? 0 : 3) : (sz < 0 ? 2 : 5);
     assert.equal(preview.pocketIndex, pocket);
     assert.equal(preview.ballId, null);
