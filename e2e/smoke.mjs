@@ -726,19 +726,25 @@ try {
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimBank === 'z');
   assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-rail'), 'z');
   assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-pocket'), '');
-  // A fully unpowered shot cannot rebound. Slider changes must update the
-  // existing guide without firing a shot or changing its first-contact rail.
+  // A fully unpowered shot cannot even REACH the rail, so both the
+  // first-contact marker and bank line must disappear. Restoring power
+  // reclassifies the same aim as a genuine straight-rail contact.
   await widePage.locator('#power').evaluate((input) => {
     input.value = '0';
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimBank === '');
-  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-rail'), 'z');
+  await widePage.waitForFunction(() =>
+    document.querySelector('#viewport')?.dataset.aimStop === '0.000');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-bank'), '');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-rail'), '',
+    'zero power must not announce a physically unreachable cushion');
   await widePage.locator('#power').evaluate((input) => {
     input.value = '55';
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimBank === 'z');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-stop'), '');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-rail'), 'z');
   assert.equal(await widePage.locator('#shots').innerText(), '00');
   await widePage.locator('#spin-cycle').click();
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimBank === '');
