@@ -558,6 +558,7 @@ let dirtyHUD = true;
 let fineAimSteps = 0;
 let cueSpin = 0; // -1: draw, 0: centre, +1: follow
 let pointerStroke = null;
+let placementButtonPointerId = null;
 let keyboardStroke = null;
 let strokeAnimation = null;
 let mode = 'practice'; // Solo challenge is opt-in; free practice stays the default.
@@ -708,6 +709,7 @@ function restart() {
   precisionFollowTargetId = null;
   viewport.dataset.panning = '';
   cancelCharge();
+  placementButtonPointerId = null;
   feedbackGate.reset();
   for (const pulse of pocketPulses) pulse.ring.visible = false;
   strokeAnimation = null;
@@ -734,6 +736,7 @@ function restart() {
 }
 function placeWhiteInHand(x, z) {
   if (!scratchPending || !respawnCue(balls, x, z)) return false;
+  placementButtonPointerId = null;
   scratchPending = false;
   placementPrompted = false;
   placementCandidate = null;
@@ -769,9 +772,17 @@ function shoot(power = Number(powerInput.value) / 100) {
 }
 // Pointer controls share the same charge waveform as SPACE. A quick tap still
 // fires with the chosen slider power; holding makes the stroke tactile on touch.
+// COLOCAR has a separate tap lifecycle: never respawn on pointerdown because
+// a release outside, cancellation or a second finger must not commit it.
 strikeButton.addEventListener('pointerdown', (event) => {
   if (event.button !== 0 || strikeButton.disabled || charge.active) return;
-  if (scratchPending) { placeWhiteInHand(); return; }
+  if (scratchPending) {
+    if (placementPointerId !== null || placementButtonPointerId !== null ||
+        (event.pointerType === 'touch' && !event.isPrimary)) return;
+    placementButtonPointerId = event.pointerId;
+    strikeButton.setPointerCapture(event.pointerId);
+    return;
+  }
   const now = performance.now();
   if (!charge.start(now)) return;
   pointerStroke = { id: event.pointerId, started: now, preset: Number(powerInput.value) / 100 };
@@ -780,6 +791,15 @@ strikeButton.addEventListener('pointerdown', (event) => {
   strikeButton.classList.add('charging');
 });
 strikeButton.addEventListener('pointerup', (event) => {
+  if (placementButtonPointerId === event.pointerId) {
+    placementButtonPointerId = null;
+    const rect = strikeButton.getBoundingClientRect();
+    const inside = event.clientX >= rect.left && event.clientX <= rect.right &&
+      event.clientY >= rect.top && event.clientY <= rect.bottom;
+    if (inside && scratchPending && placementPointerId === null)
+      placeWhiteInHand();
+    return;
+  }
   if (!pointerStroke || pointerStroke.id !== event.pointerId) return;
   const held = pointerStroke;
   const now = performance.now();
@@ -795,9 +815,17 @@ strikeButton.addEventListener('pointerup', (event) => {
   paintPower(power * 100);
   if (power > 0) shoot(power);
 });
-strikeButton.addEventListener('pointercancel', cancelCharge);
-strikeButton.addEventListener('lostpointercapture', () => {
-  if (pointerStroke) cancelCharge();
+strikeButton.addEventListener('pointercancel', (event) => {
+  if (placementButtonPointerId === event.pointerId) {
+    placementButtonPointerId = null;
+    return;
+  }
+  if (pointerStroke?.id === event.pointerId) cancelCharge();
+});
+strikeButton.addEventListener('lostpointercapture', (event) => {
+  if (placementButtonPointerId === event.pointerId)
+    placementButtonPointerId = null;
+  if (pointerStroke?.id === event.pointerId) cancelCharge();
 });
 // Keyboard and accessibility activation produce click(detail=0), not a
 // pointer release; never fire twice after a mouse/touch pointerup.

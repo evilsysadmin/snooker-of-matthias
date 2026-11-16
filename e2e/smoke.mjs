@@ -736,6 +736,44 @@ try {
     }
     assert.equal(await page.locator('#shots').innerText(), '01',
       'a real scratch must be one shot, not a fake setup');
+    // COLOCAR must obey the same release-to-commit discipline as dragging
+    // over the cloth: holding or releasing outside cancels. In the old code,
+    // merely pressing the button respawned the white immediately.
+    assert.match(await page.locator('#strike').innerText(), /COLOCAR/);
+    const placeRect = await page.locator('#strike').boundingBox();
+    const placeInside = {
+      x: placeRect.x + placeRect.width / 2,
+      y: placeRect.y + placeRect.height / 2,
+    };
+    const placeOutside = { x: placeInside.x, y: placeRect.y - 100 };
+    if (config.isMobile) {
+      const btnCdp = await context.newCDPSession(page);
+      try {
+        await btnCdp.send('Input.dispatchTouchEvent', {
+          type: 'touchStart', touchPoints: [{ id: 70, ...placeInside }],
+        });
+        assert.equal(await page.locator('#viewport').getAttribute('data-cue-placement'), 'required',
+          'mobile COLOCAR touch-down must not commit ball-in-hand');
+        await btnCdp.send('Input.dispatchTouchEvent', {
+          type: 'touchMove', touchPoints: [{ id: 70, ...placeOutside }],
+        });
+        await btnCdp.send('Input.dispatchTouchEvent', {
+          type: 'touchEnd', touchPoints: [],
+        });
+      } finally {
+        await btnCdp.detach();
+      }
+    } else {
+      await page.mouse.move(placeInside.x, placeInside.y);
+      await page.mouse.down();
+      assert.equal(await page.locator('#viewport').getAttribute('data-cue-placement'), 'required',
+        'desktop COLOCAR mouse-down must not commit ball-in-hand');
+      await page.mouse.move(placeOutside.x, placeOutside.y);
+      await page.mouse.up();
+    }
+    assert.equal(await page.locator('#viewport').getAttribute('data-cue-placement'), 'required',
+      'releasing COLOCAR outside must cancel without moving the white');
+    assert.equal(await page.locator('#shots').innerText(), '01');
     const jaw = await tablePoint(0.25, 1.975);
     const start = await tablePoint(-3, 0.4);
     const end = await tablePoint(-3.05, -0.35);
