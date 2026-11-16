@@ -665,7 +665,10 @@ try {
           : { x: rect.left + rect.width / 2 + data.x * scale,
               y: rect.top + rect.height / 2 + data.z * scale };
       }, { x, z, fill: TOP_CAMERA_FILL });
-    const corner = await tablePoint(-4.10, 1.87);
+    // Same ray from the opening white (-2.4, 0) towards (-4.10, 1.87),
+    // sampled halfway across accessible felt rather than next to the
+    // mobile bottom rail overlay.
+    const corner = await tablePoint(-3.25, 0.935);
     await page.locator('#power').evaluate((input) => {
       input.value = '95';
       input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -675,6 +678,9 @@ try {
     // establish the outgoing cue direction.
     if (config.isMobile) await page.touchscreen.tap(corner.x, corner.y);
     else await page.mouse.move(corner.x, corner.y);
+    await page.waitForFunction(() =>
+      document.querySelector('#viewport')?.dataset.aimTarget !== '1',
+      undefined, { timeout: 8000 });
     const cornerAimState = await page.locator('#viewport').evaluate(el => ({
       pocket: el.dataset.aimPocket, jaw: el.dataset.aimJaw,
       rail: el.dataset.aimRail, target: el.dataset.aimTarget,
@@ -729,7 +735,8 @@ try {
           'dragging the white does not commit prematurely');
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
       } finally {
-        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        // The successful path already released both touches. Sending an
+        // extra TouchEnd without any active contact is a CDP protocol error.
         await cdp.detach();
       }
     } else {
