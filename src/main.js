@@ -6,7 +6,7 @@ import './styles.css';
 import { createShotCharge } from './shotCharge.js';
 import { cueIdleGap, cueStrokePose, CUE_TIP_LOCAL_X } from './cueMotion.js';
 import { createCueStick } from './cueVisuals.js';
-import { predictFirstContact, predictFirstRailBounce, predictNeutralStrokeContact } from './aimPrediction.js';
+import { predictFirstContact, predictFirstRailBounce, predictStrokeContact } from './aimPrediction.js';
 import { FINE_AIM_STEP_DEGREES, rotateAim } from './fineAim.js';
 import { resolveStrokePower } from './strokeInteraction.js';
 import { remainingObjectBalls } from './practiceRules.js';
@@ -1103,6 +1103,7 @@ function updateCue(now) {
   viewport.dataset.aimPocket = '';
   viewport.dataset.aimBank = '';
   viewport.dataset.aimStop = '';
+  viewport.dataset.aimSpinLimit = '';
   // Shot physics already starts in shoot(); the stick is pure presentation.
   // Three distinct beats: quick contact, restrained recoil, quiet recovery.
   viewport.dataset.cueCharge = charge.active ? 'active' : '';
@@ -1134,12 +1135,11 @@ function updateCue(now) {
   cueStick.position.set(cue.x - aim.x * offset, TABLE.ballRadius + 0.052, cue.z - aim.z * offset);
   cueDirection.copy(aim);
   cueStick.rotation.y = -Math.atan2(aim.z, aim.x);
-  // With neutral spin, even an ideal geometric first contact is misleading
-  // if the chosen power stops the cue beforehand. Follow/draw retain the
-  // existing geometric guide because spin changes the range nonlinearly.
-  const preview = cueSpin === 0
-    ? predictNeutralStrokeContact(balls, aim.x, aim.z, Number(powerInput.value) / 100)
-    : predictFirstContact(balls, aim.x, aim.z);
+  // Neutral spin shows a conservative stopping position. For follow/draw
+  // we ONLY bound the maximum physically possible reach, not the exact
+  // stopping location or a promised spin-assisted contact.
+  const preview = predictStrokeContact(
+    balls, aim.x, aim.z, Number(powerInput.value) / 100, cueSpin);
   if (!preview) { guide.visible = false; syncTargetLens(null); return; }
   syncTargetLens(preview.ballId);
   // The ordinary guide starts just beyond the white. For a short-stop
@@ -1156,12 +1156,18 @@ function updateCue(now) {
     guide.computeLineDistances();
   }
   if (preview.stopsShort) {
-    // Muted stop marker: do not pretend a ball, pocket or rail is reachable.
-    viewport.dataset.aimStop = preview.distance.toFixed(3);
-    if (preview.distance >= 0.045) {
-      impactDot.material.color.setHex(0xb5c6b6);
-      impactDot.position.set(preview.x, TABLE.ballRadius + 0.057, preview.z);
-      impactDot.visible = true;
+    if (preview.upperBoundOnly) {
+      // Soft spin: the line is just a generous travel cap. A stop dot here
+      // would pretend to know where the white actually settles.
+      viewport.dataset.aimSpinLimit = preview.distance.toFixed(3);
+    } else {
+      // Neutral ball: restrained approximate stopping-position marker.
+      viewport.dataset.aimStop = preview.distance.toFixed(3);
+      if (preview.distance >= 0.045) {
+        impactDot.material.color.setHex(0xb5c6b6);
+        impactDot.position.set(preview.x, TABLE.ballRadius + 0.057, preview.z);
+        impactDot.visible = true;
+      }
     }
   } else if (preview.ballId !== null) {
     const target = balls.find((ball) => ball.id === preview.ballId);

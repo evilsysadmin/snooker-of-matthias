@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TABLE, cueStrikeSpeed, strikeCue, stepPhysics } from './physics.js';
-import { predictFirstContact, predictFirstRailBounce, predictNeutralStrokeContact } from './aimPrediction.js';
+import { predictFirstContact, predictFirstRailBounce, predictNeutralStrokeContact, predictStrokeContact } from './aimPrediction.js';
 
 const cue = (x = 0, z = 0) => ({ id: 0, x, z, vx: 0, vz: 0, pocketed: false });
 const object = (id, x, z, pocketed = false) => ({ id, x, z, vx: 0, vz: 0, pocketed });
@@ -251,6 +251,64 @@ test('a reachable near ball retains the real first-contact guide at low power', 
   assert.equal(predicted.stopsShort, false);
   assert.equal(predicted.ballId, 7);
   assert.ok(predicted.distance < 0.1);
+});
+
+test('follow/draw bound cannot announce distant unreachable objects, rails, jaws or pockets', () => {
+  const scenarios = [
+    { balls: [cue(), object(5, 2.0, 0)], dx: 1, dz: 0 },
+    { balls: [cue()], dx: -1, dz: 0 },
+    { balls: [cue(0.22, 1.6)], dx: 0, dz: 1 },
+    { balls: [cue(0, 1.6)], dx: 0, dz: 1 },
+  ];
+  for (const { balls, dx, dz } of scenarios) {
+    const first = predictFirstContact(balls, dx, dz);
+    const untouched = structuredClone(balls);
+    for (const spin of [-1, 1]) {
+      const short = predictStrokeContact(balls, dx, dz, .01, spin);
+      assert.equal(short.stopsShort, true);
+      assert.equal(short.upperBoundOnly, true);
+      assert.ok(short.distance < first.distance);
+      assert.equal(short.ballId, null);
+      assert.equal(short.railAxis, null);
+      assert.equal(short.jawIndex, null);
+      assert.equal(short.pocketIndex, null);
+      const strong = predictStrokeContact(balls, dx, dz, 1, spin);
+      assert.equal(strong.stopsShort, false);
+      assert.equal(strong.ballId, first.ballId);
+      assert.equal(strong.railAxis, first.railAxis);
+      assert.equal(strong.jawIndex, first.jawIndex);
+      assert.equal(strong.pocketIndex, first.pocketIndex);
+    }
+    assert.deepEqual(balls, untouched, 'bound-only preview must not mutate balls');
+  }
+  const near = [cue(), object(5, .29, 0)];
+  assert.equal(predictStrokeContact(near, 1, 0, .05, 1).ballId, 5,
+    'a reachable close object still gets its true geometric contact');
+  assert.deepEqual(predictStrokeContact(near, 1, 0, .05, 0),
+    predictNeutralStrokeContact(near, 1, 0, .05),
+    'neutral-spin contract remains unchanged');
+  assert.deepEqual(predictStrokeContact(near, 1, 0, .05, NaN),
+    predictNeutralStrokeContact(near, 1, 0, .05));
+  assert.equal(predictStrokeContact([cue()], 0, 0, .05, 1), null);
+  assert.equal(predictStrokeContact([cue(0, 0)], 1, 0, .05, Infinity)?.stopsShort, true);
+});
+
+test('spin reach cap stays beyond real 120 Hz white-ball travel for soft strokes', () => {
+  for (const spin of [-1, 1]) {
+    for (const power of [.01, .05, .10]) {
+      const balls = [cue()];
+      const predicted = predictStrokeContact(balls, 1, 0, power, spin);
+      assert.equal(predicted.upperBoundOnly, true);
+      assert.equal(strikeCue(balls, 1, 0, power, spin), true);
+      let maxDistance = 0;
+      for (let step = 0; step < 900; step++) {
+        stepPhysics(balls, 1 / 120);
+        maxDistance = Math.max(maxDistance, balls[0].x);
+      }
+      assert.ok(maxDistance <= predicted.distance + .035,
+        'maximum travel with spin must not exceed conservative upper bound');
+    }
+  }
 });
 
 test('invalid directions and scratched white yield no prediction', () => {

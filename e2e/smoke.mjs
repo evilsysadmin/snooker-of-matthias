@@ -252,6 +252,36 @@ try {
       'power-only preview must not fire a shot');
     await selectSpin(); // Centre -> Follow, preserve prior input state
     assert.equal(await spinControl.getAttribute('data-spin'), '1');
+    // A soft follow/draw stroke cannot reach the opening rack either. Unlike
+    // centre spin, its truncated guide is a bound, NEVER an exact stop dot.
+    for (const expectedSpin of ['1', '-1']) {
+      assert.equal(await spinControl.getAttribute('data-spin'), expectedSpin);
+      await page.locator('#power').evaluate((input) => {
+        input.value = '5';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      await page.waitForFunction(() =>
+        Number(document.querySelector('#viewport')?.dataset.aimSpinLimit) > 0);
+      const cap = Number(await page.locator('#viewport').getAttribute('data-aim-spin-limit'));
+      assert.ok(cap < 0.3, '5% spin has too little total impulse to reach distant rack');
+      assert.equal(await page.locator('#viewport').getAttribute('data-aim-target'), '');
+      assert.equal(await page.locator('#viewport').getAttribute('data-aim-stop'), '',
+        'spin limit is not a promised rest position');
+      assert.equal(await lens.isVisible(), false);
+      await page.locator('#power').evaluate((input) => {
+        input.value = '55';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
+      assert.equal(await page.locator('#viewport').getAttribute('data-aim-spin-limit'), '');
+      if (config.isMobile) await lens.waitFor({ state: 'visible' });
+      if (expectedSpin === '1') await selectSpin(); // Follow -> Draw
+    }
+    await selectSpin(); // Draw -> Centre
+    await selectSpin(); // Centre -> Follow, restore prior test state
+    assert.equal(await spinControl.getAttribute('data-spin'), '1');
+    assert.equal(await page.locator('#shots').innerText(), '00',
+      'spin preview bounds never fire a shot');
     // The actual opening rack offers a clear line towards the upper-left
     // corner's long-rail jaw. The guide must now identify that physical jaw.
     const jawScreen = await page.locator('#viewport canvas').evaluate((canvas, fill) => {
