@@ -666,15 +666,38 @@ try {
               y: rect.top + rect.height / 2 + data.z * scale };
       }, { x, z, fill: TOP_CAMERA_FILL });
     const corner = await tablePoint(-4.10, 1.87);
-    await page.mouse.move(corner.x, corner.y);
     await page.locator('#power').evaluate((input) => {
       input.value = '95';
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    await page.locator('#strike').click();
-    await page.waitForFunction(() =>
-      document.querySelector('#viewport')?.dataset.cuePlacement === 'required',
-      undefined, { timeout: 25000 });
+    // Real touch rather than emulated mouse hover on a mobile viewport:
+    // this also verifies that tapping the aiming cloth is sufficient to
+    // establish the outgoing cue direction.
+    if (config.isMobile) await page.touchscreen.tap(corner.x, corner.y);
+    else await page.mouse.move(corner.x, corner.y);
+    const cornerAimState = await page.locator('#viewport').evaluate(el => ({
+      pocket: el.dataset.aimPocket, jaw: el.dataset.aimJaw,
+      rail: el.dataset.aimRail, target: el.dataset.aimTarget,
+      camera: el.dataset.camera, power: document.querySelector('#power')?.value,
+    }));
+    console.log('SCRATCH_AIM_' + config.name.toUpperCase(), cornerAimState);
+    if (config.isMobile) await page.locator('#strike').tap();
+    else await page.locator('#strike').click();
+    try {
+      await page.waitForFunction(() =>
+        document.querySelector('#viewport')?.dataset.cuePlacement === 'required',
+        undefined, { timeout: config.isMobile ? 45000 : 25000 });
+    } catch (error) {
+      console.log('SCRATCH_DIAGNOSTIC_' + config.name.toUpperCase(),
+        await page.locator('#viewport').evaluate(el => ({
+          placement: el.dataset.cuePlacement, aimPocket: el.dataset.aimPocket,
+          aimJaw: el.dataset.aimJaw, aimRail: el.dataset.aimRail,
+          strokes: document.querySelector('#shots')?.textContent,
+          charge: el.dataset.cueCharge, stroke: el.dataset.stroke,
+          message: document.querySelector('#commentary')?.textContent,
+        })));
+      throw error;
+    }
     assert.equal(await page.locator('#shots').innerText(), '01',
       'a real scratch must be one shot, not a fake setup');
     const jaw = await tablePoint(0.25, 1.975);
