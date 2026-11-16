@@ -276,6 +276,33 @@ test('pool ball-in-hand accepts any vacant table location when stopped', () => {
   assert.equal(respawnCue(balls, -3, 0), false, 'cannot move a live cue');
 });
 
+test('ball-in-hand rejects physical overlaps with all twelve pocket jaws', () => {
+  const balls = createRack();
+  balls[0].pocketed = true;
+  const before = structuredClone(balls);
+  assert.equal(POCKET_JAWS.length, 12);
+  for (const jaw of POCKET_JAWS) {
+    // Go 13cm inward from each tip: inside normal cloth and outside all
+    // pocket capture circles, but still intersecting the rounded jaw.
+    const longRail = Math.abs(jaw.z) > TABLE.halfZ - 0.15;
+    const x = longRail ? jaw.x : jaw.x - Math.sign(jaw.x) * 0.13;
+    const z = longRail ? jaw.z - Math.sign(jaw.z) * 0.13 : jaw.z;
+    assert.ok(Math.abs(x) < TABLE.halfX - TABLE.ballRadius);
+    assert.ok(Math.abs(z) < TABLE.halfZ - TABLE.ballRadius);
+    assert.ok(POCKETS.every(([px, pz, radius]) =>
+      Math.hypot(px - x, pz - z) >= radius + TABLE.ballRadius),
+      'this is a real jaw-only overlap, not a pocket false positive');
+    assert.equal(canPlaceCueOnTable(balls, x, z), false,
+      'jaw collision must reject ball-in-hand: ' + jaw.x + ',' + jaw.z);
+    assert.equal(respawnCue(balls, x, z), false,
+      'illegal placement must not revive or displace the white');
+  }
+  assert.deepEqual(balls, before);
+  assert.equal(canPlaceCueOnTable(balls, -3, 0.4), true,
+    'vacant playable cloth remains available');
+  assert.equal(respawnCue(balls, -3, 0.4), true);
+});
+
 test('keyboard ball-in-hand fallback avoids occupied head spot', () => {
   const balls = createRack();
   const cue = balls[0];
