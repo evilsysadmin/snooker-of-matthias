@@ -219,6 +219,39 @@ try {
     } else {
       assert.equal(await lens.isVisible(), false, 'desktop keeps its uncluttered table');
     }
+    // The spin-selection smoke above deliberately left follow enabled.
+    // Switch to NEUTRAL before checking neutral-only stopping-distance logic;
+    // restore follow afterwards so later spin/game contracts are unchanged.
+    assert.equal(await spinControl.getAttribute('data-spin'), '1');
+    await selectSpin(); // Follow -> Draw
+    await selectSpin(); // Draw -> Centre
+    assert.equal(await spinControl.getAttribute('data-spin'), '0');
+    // A 5% neutral stroke cannot reach the distant rack. Its guide should
+    // stop nearby, without a false first-hit target or a misleading mobile lens.
+    await page.locator('#power').evaluate((input) => {
+      input.value = '5';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.waitForFunction(() => Number(document.querySelector('#viewport')?.dataset.aimStop) > 0);
+    const stopDistance = Number(await page.locator('#viewport').getAttribute('data-aim-stop'));
+    assert.ok(stopDistance > 0.045 && stopDistance < 0.2,
+      'soft-shot marker must be near the cue, not at the distant rack');
+    assert.equal(await page.locator('#viewport').getAttribute('data-aim-target'), '',
+      'do not claim a first-ball hit when the cue stops short');
+    assert.equal(await lens.isVisible(), false,
+      'mobile magnifier must hide when power cannot reach the target');
+    await page.locator('#power').evaluate((input) => {
+      input.value = '55';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
+    assert.equal(await page.locator('#viewport').getAttribute('data-aim-stop'), '',
+      'restoring normal power must clear the short-stop hint');
+    if (config.isMobile) await lens.waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#shots').innerText(), '00',
+      'power-only preview must not fire a shot');
+    await selectSpin(); // Centre -> Follow, preserve prior input state
+    assert.equal(await spinControl.getAttribute('data-spin'), '1');
     // The actual opening rack offers a clear line towards the upper-left
     // corner's long-rail jaw. The guide must now identify that physical jaw.
     const jawScreen = await page.locator('#viewport canvas').evaluate((canvas, fill) => {
@@ -693,19 +726,25 @@ try {
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimBank === 'z');
   assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-rail'), 'z');
   assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-pocket'), '');
-  // A fully unpowered shot cannot rebound. Slider changes must update the
-  // existing guide without firing a shot or changing its first-contact rail.
+  // A fully unpowered shot cannot even REACH the rail, so both the
+  // first-contact marker and bank line must disappear. Restoring power
+  // reclassifies the same aim as a genuine straight-rail contact.
   await widePage.locator('#power').evaluate((input) => {
     input.value = '0';
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimBank === '');
-  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-rail'), 'z');
+  await widePage.waitForFunction(() =>
+    document.querySelector('#viewport')?.dataset.aimStop === '0.000');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-bank'), '');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-rail'), '',
+    'zero power must not announce a physically unreachable cushion');
   await widePage.locator('#power').evaluate((input) => {
     input.value = '55';
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimBank === 'z');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-stop'), '');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-aim-rail'), 'z');
   assert.equal(await widePage.locator('#shots').innerText(), '00');
   await widePage.locator('#spin-cycle').click();
   await widePage.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimBank === '');

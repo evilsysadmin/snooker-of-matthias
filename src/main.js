@@ -6,7 +6,7 @@ import './styles.css';
 import { createShotCharge } from './shotCharge.js';
 import { cueIdleGap, cueStrokePose, CUE_TIP_LOCAL_X } from './cueMotion.js';
 import { createCueStick } from './cueVisuals.js';
-import { predictFirstContact, predictFirstRailBounce } from './aimPrediction.js';
+import { predictFirstContact, predictFirstRailBounce, predictNeutralStrokeContact } from './aimPrediction.js';
 import { FINE_AIM_STEP_DEGREES, rotateAim } from './fineAim.js';
 import { resolveStrokePower } from './strokeInteraction.js';
 import { remainingObjectBalls } from './practiceRules.js';
@@ -1082,6 +1082,7 @@ function updateCue(now) {
   viewport.dataset.aimRail = '';
   viewport.dataset.aimPocket = '';
   viewport.dataset.aimBank = '';
+  viewport.dataset.aimStop = '';
   // Shot physics already starts in shoot(); the stick is pure presentation.
   // Three distinct beats: quick contact, restrained recoil, quiet recovery.
   viewport.dataset.cueCharge = charge.active ? 'active' : '';
@@ -1113,15 +1114,36 @@ function updateCue(now) {
   cueStick.position.set(cue.x - aim.x * offset, TABLE.ballRadius + 0.052, cue.z - aim.z * offset);
   cueDirection.copy(aim);
   cueStick.rotation.y = -Math.atan2(aim.z, aim.x);
-  const preview = predictFirstContact(balls, aim.x, aim.z);
+  // With neutral spin, even an ideal geometric first contact is misleading
+  // if the chosen power stops the cue beforehand. Follow/draw retain the
+  // existing geometric guide because spin changes the range nonlinearly.
+  const preview = cueSpin === 0
+    ? predictNeutralStrokeContact(balls, aim.x, aim.z, Number(powerInput.value) / 100)
+    : predictFirstContact(balls, aim.x, aim.z);
   if (!preview) { guide.visible = false; syncTargetLens(null); return; }
   syncTargetLens(preview.ballId);
-  const start = Math.min(preview.distance, TABLE.ballRadius * 1.2);
+  // The ordinary guide starts just beyond the white. For a short-stop
+  // preview, that old offset can exceed the entire travel and collapse both
+  // vertices onto the same point. Keep a genuine cue-to-stop segment instead.
+  const start = preview.stopsShort
+    ? Math.min(TABLE.ballRadius * 0.5, preview.distance * 0.25)
+    : Math.min(preview.distance, TABLE.ballRadius * 1.2);
   const front = new THREE.Vector3(cue.x + aim.x * start, 0.095, cue.z + aim.z * start);
   const end = new THREE.Vector3(preview.x, 0.095, preview.z);
-  guide.geometry.setFromPoints([front, end]);
-  guide.computeLineDistances();
-  if (preview.ballId !== null) {
+  guide.visible = !preview.stopsShort || preview.distance >= 0.045;
+  if (guide.visible) {
+    guide.geometry.setFromPoints([front, end]);
+    guide.computeLineDistances();
+  }
+  if (preview.stopsShort) {
+    // Muted stop marker: do not pretend a ball, pocket or rail is reachable.
+    viewport.dataset.aimStop = preview.distance.toFixed(3);
+    if (preview.distance >= 0.045) {
+      impactDot.material.color.setHex(0xb5c6b6);
+      impactDot.position.set(preview.x, TABLE.ballRadius + 0.057, preview.z);
+      impactDot.visible = true;
+    }
+  } else if (preview.ballId !== null) {
     const target = balls.find((ball) => ball.id === preview.ballId);
     if (precisionZoom && camera === topCamera && target && !target.pocketed) {
       precisionTargetHalo.position.set(target.x, TABLE.ballRadius + 0.052, target.z);

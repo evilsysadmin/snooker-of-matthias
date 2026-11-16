@@ -85,6 +85,33 @@ export function predictFirstContact(balls, dx, dz) {
   return { x, z, distance, ballId, jawIndex, pocketIndex, railAxis };
 }
 
+// First-contact geometry alone does not prove that the ball has enough
+// energy to get there. For a neutral shot, bound the visible cue guide by the
+// actual launch speed and cloth deceleration. This is deliberately conservative
+// near the stopping threshold (discrete 120 Hz physics and a 0.055 m/s
+// settling cutoff), not a promise of an exact final resting pixel.
+// Follow/draw are excluded by the caller: their retained spin changes travel.
+export function predictNeutralStrokeContact(balls, dx, dz, power) {
+  const first = predictFirstContact(balls, dx, dz);
+  if (!first) return null;
+  const cue = balls.find(ball => ball.id === 0);
+  const speed = cueStrikeSpeed(power);
+  const reach = Math.max(0, speed * speed / (2 * TABLE.rollingDeceleration) - 0.025);
+  if (reach + 1e-9 >= first.distance) return { ...first, stopsShort: false };
+  const length = Math.hypot(dx, dz);
+  const distance = Math.min(reach, first.distance);
+  return {
+    x: cue.x + dx / length * distance,
+    z: cue.z + dz / length * distance,
+    distance,
+    ballId: null,
+    jawIndex: null,
+    pocketIndex: null,
+    railAxis: null,
+    stopsShort: true,
+  };
+}
+
 // A short neutral-spin direction hint, not a promised second pot. Bound
 // reach by the SAME launch speed, cloth drag and cushion restitution as the
 // deterministic physics. At insufficient power the bank must not be shown.

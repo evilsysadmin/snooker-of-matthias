@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TABLE, cueStrikeSpeed, strikeCue, stepPhysics } from './physics.js';
-import { predictFirstContact, predictFirstRailBounce } from './aimPrediction.js';
+import { predictFirstContact, predictFirstRailBounce, predictNeutralStrokeContact } from './aimPrediction.js';
 
 const cue = (x = 0, z = 0) => ({ id: 0, x, z, vx: 0, vz: 0, pocketed: false });
 const object = (id, x, z, pocketed = false) => ({ id, x, z, vx: 0, vz: 0, pocketed });
@@ -194,6 +194,63 @@ test('bank hint respects actual selected power and shared cloth drag', () => {
   assert.ok(fast && Math.hypot(fast.endX - fast.x, fast.endZ - fast.z) > 0.79);
   assert.equal(predictFirstRailBounce(far, 1, 0, 0.8, NaN), null);
   assert.equal(predictFirstRailBounce(far, 1, 0, 0.8, -1), null);
+});
+
+test('neutral soft shots stop the guide before unreachable object, cushion, jaw or pocket', () => {
+  const cases = [
+    { balls: [cue(), object(3, 1.5, 0)], dx: 1, dz: 0, kind: 'ball' },
+    { balls: [cue()], dx: -1, dz: 0, kind: 'rail' },
+    { balls: [cue(0.22, 1.6)], dx: 0, dz: 1, kind: 'jaw' },
+    { balls: [cue(0, 1.6)], dx: 0, dz: 1, kind: 'pocket' },
+  ];
+  for (const { balls, dx, dz, kind } of cases) {
+    const pristine = structuredClone(balls);
+    const first = predictFirstContact(balls, dx, dz);
+    assert.ok(first, kind);
+    const short = predictNeutralStrokeContact(balls, dx, dz, 0.05);
+    assert.equal(short.stopsShort, true, kind);
+    assert.ok(short.distance < first.distance, kind);
+    assert.equal(short.ballId, null);
+    assert.equal(short.pocketIndex, null);
+    assert.equal(short.jawIndex, null);
+    assert.equal(short.railAxis, null);
+    assert.deepEqual(balls, pristine, 'preview must not mutate simulation');
+    const strong = predictNeutralStrokeContact(balls, dx, dz, 1);
+    assert.equal(strong.stopsShort, false, kind);
+    assert.equal(strong.ballId, first.ballId);
+    assert.equal(strong.pocketIndex, first.pocketIndex);
+    assert.equal(strong.jawIndex, first.jawIndex);
+    assert.equal(strong.railAxis, first.railAxis);
+  }
+});
+
+test('neutral stop marker is close to actual 120 Hz simulation distance', () => {
+  for (const power of [0.05, 0.1, 0.15]) {
+    const balls = [cue()], intended = predictNeutralStrokeContact(balls, 1, 0, power);
+    assert.equal(intended.stopsShort, true);
+    assert.ok(intended.distance >= 0);
+    assert.equal(strikeCue(balls, 1, 0, power), true);
+    for (let i = 0; i < 900; i++) stepPhysics(balls, 1 / 120);
+    assert.equal(balls[0].vx, 0);
+    assert.ok(balls[0].x >= intended.distance - 0.03,
+      'conservative preview should not overshoot real stop');
+    assert.ok(balls[0].x - intended.distance < 0.09,
+      'soft preview should remain close to real stopping distance');
+  }
+  const still = predictNeutralStrokeContact([cue(), object(1, 1, 0)], 1, 0, 0);
+  assert.equal(still.stopsShort, true);
+  assert.equal(still.distance, 0);
+  assert.equal(still.ballId, null);
+  assert.equal(predictNeutralStrokeContact([cue()], 0, 0, 0.4), null);
+  assert.equal(predictNeutralStrokeContact([object(0, 0, 0, true)], 1, 0, 0.4), null);
+});
+
+test('a reachable near ball retains the real first-contact guide at low power', () => {
+  const near = [cue(), object(7, 0.29, 0)];
+  const predicted = predictNeutralStrokeContact(near, 1, 0, 0.05);
+  assert.equal(predicted.stopsShort, false);
+  assert.equal(predicted.ballId, 7);
+  assert.ok(predicted.distance < 0.1);
 });
 
 test('invalid directions and scratched white yield no prediction', () => {
