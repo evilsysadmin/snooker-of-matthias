@@ -275,6 +275,10 @@ export function canPlaceCueOnTable(balls, x, z) {
       Math.abs(z) > TABLE.halfZ - TABLE.ballRadius) return false;
   if (POCKETS.some(([px, pz, radius]) =>
     Math.hypot(px - x, pz - z) < radius + TABLE.ballRadius)) return false;
+  // The rounded pocket tips are physical obstacles, not just decoration.
+  // Reject any ball-in-hand that would overlap a jaw on the next tick.
+  if (POCKET_JAWS.some(jaw =>
+    Math.hypot(jaw.x - x, jaw.z - z) < TABLE.ballRadius + jaw.radius + 0.004)) return false;
   return balls.every((b) => b.id === 0 || b.pocketed ||
     Math.hypot(b.x - x, b.z - z) >= 2 * TABLE.ballRadius + 0.004);
 }

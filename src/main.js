@@ -1001,7 +1001,8 @@ canvas.addEventListener('pointerdown', (event) => {
   dragging = true;
   if (scratchPending) placementPointerId = event.pointerId;
   canvas.setPointerCapture(event.pointerId);
-  pointAim(event, scratchPending);
+  // Preview on press/drag; only pointerup commits the selected white spot.
+  pointAim(event);
 });
 canvas.addEventListener('pointermove', (event) => {
   if (panPointer) {
@@ -1090,6 +1091,8 @@ function updateCue(now) {
   impactDot.visible = false;
   bankGuide.visible = false;
   placementGhost.visible = scratchPending && !ballsMoving(balls) && Boolean(placementCandidate);
+  viewport.dataset.placementCandidate = placementGhost.visible
+    ? (placementCandidate.valid ? 'valid' : 'blocked') : '';
   if (placementGhost.visible) {
     placementGhost.position.set(placementCandidate.x, TABLE.ballRadius + 0.052, placementCandidate.z);
     placementGhost.material.color.setHex(placementCandidate.valid ? 0xf6e8be : 0xe86464);

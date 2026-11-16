@@ -647,6 +647,122 @@ try {
       document.querySelector('#viewport')?.dataset.gameMode === 'practice');
     assert.equal(await soloStatus.isHidden(), true);
     assert.equal(await page.locator('#shots').innerText(), '00');
+
+    // Real physical scratch from the opening white towards the empty
+    // upper-left corner. Verify a blocked pocket jaw and drag-to-place on
+    // mouse and actual mobile touch events. No physics state injections.
+    const tablePoint = async (x, z) => page.locator('#viewport canvas').evaluate(
+      (canvas, data) => {
+        const rect = canvas.getBoundingClientRect();
+        const aspect = rect.width / rect.height;
+        const portrait = rect.width <= 700 && rect.height > rect.width * 1.15;
+        const hw = portrait ? 2.51 : 4.75, hh = portrait ? 4.75 : 2.51;
+        const halfHeight = Math.max(hh / data.fill, hw / (aspect * data.fill));
+        const scale = rect.height / (2 * halfHeight);
+        return portrait
+          ? { x: rect.left + rect.width / 2 + data.z * scale,
+              y: rect.top + rect.height / 2 - data.x * scale }
+          : { x: rect.left + rect.width / 2 + data.x * scale,
+              y: rect.top + rect.height / 2 + data.z * scale };
+      }, { x, z, fill: TOP_CAMERA_FILL });
+    // Same ray from the opening white (-2.4, 0) towards (-4.10, 1.87),
+    // sampled halfway across accessible felt rather than next to the
+    // mobile bottom rail overlay.
+    const corner = await tablePoint(-3.25, 0.935);
+    await page.locator('#power').evaluate((input) => {
+      input.value = '95';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    // Real touch rather than emulated mouse hover on a mobile viewport:
+    // this also verifies that tapping the aiming cloth is sufficient to
+    // establish the outgoing cue direction.
+    if (config.isMobile) await page.touchscreen.tap(corner.x, corner.y);
+    else await page.mouse.move(corner.x, corner.y);
+    await page.waitForFunction(() =>
+      document.querySelector('#viewport')?.dataset.aimTarget !== '1',
+      undefined, { timeout: 8000 });
+    const cornerAimState = await page.locator('#viewport').evaluate(el => ({
+      pocket: el.dataset.aimPocket, jaw: el.dataset.aimJaw,
+      rail: el.dataset.aimRail, target: el.dataset.aimTarget,
+      camera: el.dataset.camera, power: document.querySelector('#power')?.value,
+    }));
+    console.log('SCRATCH_AIM_' + config.name.toUpperCase(), cornerAimState);
+    if (config.isMobile) await page.locator('#strike').tap();
+    else await page.locator('#strike').click();
+    try {
+      await page.waitForFunction(() =>
+        document.querySelector('#viewport')?.dataset.cuePlacement === 'required',
+        undefined, { timeout: config.isMobile ? 45000 : 25000 });
+    } catch (error) {
+      console.log('SCRATCH_DIAGNOSTIC_' + config.name.toUpperCase(),
+        await page.locator('#viewport').evaluate(el => ({
+          placement: el.dataset.cuePlacement, aimPocket: el.dataset.aimPocket,
+          aimJaw: el.dataset.aimJaw, aimRail: el.dataset.aimRail,
+          strokes: document.querySelector('#shots')?.textContent,
+          charge: el.dataset.cueCharge, stroke: el.dataset.stroke,
+          message: document.querySelector('#commentary')?.textContent,
+        })));
+      throw error;
+    }
+    assert.equal(await page.locator('#shots').innerText(), '01',
+      'a real scratch must be one shot, not a fake setup');
+    const jaw = await tablePoint(0.25, 1.975);
+    const start = await tablePoint(-3, 0.4);
+    const end = await tablePoint(-3.05, -0.35);
+    if (config.isMobile) {
+      const cdp = await context.newCDPSession(page);
+      const touch = (id, p) => ({ id, x: p.x, y: p.y });
+      try {
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchStart', touchPoints: [touch(64, jaw)],
+        });
+        await page.waitForFunction(() =>
+          document.querySelector('#viewport')?.dataset.placementCandidate === 'blocked');
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        assert.equal(await page.locator('#viewport').getAttribute('data-cue-placement'), 'required',
+          'a pocket jaw cannot accept a white ball');
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchStart', touchPoints: [touch(65, start)],
+        });
+        await page.waitForFunction(() =>
+          document.querySelector('#viewport')?.dataset.placementCandidate === 'valid');
+        assert.equal(await page.locator('#viewport').getAttribute('data-cue-placement'), 'required',
+          'pressing the felt only previews; finger release must commit placement');
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchMove', touchPoints: [touch(65, end)],
+        });
+        assert.equal(await page.locator('#viewport').getAttribute('data-cue-placement'), 'required',
+          'dragging the white does not commit prematurely');
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      } finally {
+        // The successful path already released both touches. Sending an
+        // extra TouchEnd without any active contact is a CDP protocol error.
+        await cdp.detach();
+      }
+    } else {
+      await page.mouse.move(jaw.x, jaw.y);
+      await page.mouse.down();
+      await page.waitForFunction(() =>
+        document.querySelector('#viewport')?.dataset.placementCandidate === 'blocked');
+      await page.mouse.up();
+      assert.equal(await page.locator('#viewport').getAttribute('data-cue-placement'), 'required');
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down();
+      await page.waitForFunction(() =>
+        document.querySelector('#viewport')?.dataset.placementCandidate === 'valid');
+      assert.equal(await page.locator('#viewport').getAttribute('data-cue-placement'), 'required');
+      await page.mouse.move(end.x, end.y, { steps: 4 });
+      assert.equal(await page.locator('#viewport').getAttribute('data-cue-placement'), 'required');
+      await page.mouse.up();
+    }
+    await page.waitForFunction(() =>
+      document.querySelector('#viewport')?.dataset.cuePlacement === '',
+      undefined, { timeout: 5000 });
+    assert.equal(await page.locator('#shots').innerText(), '01',
+      'ball-in-hand is not a new shot');
+    assert.equal(await page.locator('#viewport').getAttribute('data-placement-candidate'), '');
+    await page.waitForFunction(() =>
+      document.querySelector('#viewport')?.dataset.cueLocator === 'ready');
     assert.deepEqual(errors, [], config.name + ' browser runtime errors');
     console.log('SNOOKER_BROWSER_' + config.name.toUpperCase() + '_PASS', dimensions);
     await context.close();
