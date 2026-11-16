@@ -306,6 +306,47 @@ try {
       'a rail must not invent a first-hit object-ball magnifier');
     await page.mouse.move(rackScreen.x, rackScreen.y);
     await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
+    if (config.isMobile) {
+      // Real Chromium multi-touch (CDP, not synthetic DOM events): the first
+      // finger controls the cue even when a second finger taps/drags/leaves.
+      const cdp = await context.newCDPSession(page);
+      const first = { id: 51, x: rackScreen.x, y: rackScreen.y };
+      const second = { id: 52, x: railScreen.x, y: railScreen.y };
+      try {
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchStart', touchPoints: [first],
+        });
+        await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchStart', touchPoints: [first, second],
+        });
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchMove', touchPoints: [first,
+            { ...second, x: second.x + 8, y: second.y - 5 }],
+        });
+        assert.equal(await page.locator('#viewport').getAttribute('data-aim-target'), '1',
+          'second finger cannot hijack the first-finger aiming direction');
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchEnd', touchPoints: [first],
+        });
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchMove', touchPoints: [{ ...first, x: railScreen.x, y: railScreen.y }],
+        });
+        await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimRail === 'z',
+          undefined, { timeout: 5000 });
+        assert.equal(await page.locator('#viewport').getAttribute('data-aim-target'), '',
+          'primary drag continues when second finger is released');
+      } finally {
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchEnd', touchPoints: [],
+        });
+        await cdp.detach();
+      }
+      await page.mouse.move(rackScreen.x, rackScreen.y);
+      await page.waitForFunction(() => document.querySelector('#viewport')?.dataset.aimTarget === '1');
+      assert.equal(await page.locator('#shots').innerText(), '00',
+        'multi-touch aiming never fires a shot');
+    }
     assert.equal(await page.locator('#viewport').getAttribute('data-aim-rail'), '',
       'direct re-aiming clears the previous band marker');
     assert.equal(await page.locator('#viewport').getAttribute('data-aim-jaw'), '',

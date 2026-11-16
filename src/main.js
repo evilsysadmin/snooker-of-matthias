@@ -543,6 +543,7 @@ let balls = createRack();
 let shots = 0;
 let potted = 0;
 let dragging = false;
+let aimPointerId = null;
 let panPointer = null;
 let precisionManualPan = false;
 let precisionFollowActive = false;
@@ -700,6 +701,8 @@ function restart() {
     syncTopFraming();
   }
   panPointer = null;
+  aimPointerId = null;
+  dragging = false;
   precisionManualPan = false;
   precisionFollowActive = false;
   precisionFollowTargetId = null;
@@ -945,6 +948,18 @@ function finishPan(event) {
   viewport.dataset.panning = '';
   return true;
 }
+function finishAimGesture(event, commitPlacement = false) {
+  // A secondary finger may leave, cancel or lose capture without cancelling
+  // the gesture owned by the first finger.
+  if (aimPointerId !== event.pointerId) return false;
+  if (placementPointerId === event.pointerId) {
+    if (commitPlacement && scratchPending) pointAim(event, true);
+    placementPointerId = null;
+  }
+  aimPointerId = null;
+  dragging = false;
+  return true;
+}
 canvas.addEventListener('contextmenu', (event) => {
   if (precisionZoom && camera === topCamera) event.preventDefault();
 });
@@ -972,7 +987,7 @@ canvas.addEventListener('pointerdown', (event) => {
   // the exact aim direction is more important than responding to hover.
   if (precisionZoom && camera === topCamera && event.pointerType === 'mouse' &&
       (event.button === 2 || (event.button === 0 && event.shiftKey))) {
-    if (panPointer) return;
+    if (panPointer || aimPointerId !== null) return;
     panPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
     dragging = false;
     viewport.dataset.panning = 'active';
@@ -980,7 +995,9 @@ canvas.addEventListener('pointerdown', (event) => {
     event.preventDefault();
     return;
   }
-  if (event.button !== 0 || panPointer) return;
+  if (event.button !== 0 || panPointer || aimPointerId !== null) return;
+  // The first pointer owns the cue. Later touches cannot retarget it.
+  aimPointerId = event.pointerId;
   dragging = true;
   if (scratchPending) placementPointerId = event.pointerId;
   canvas.setPointerCapture(event.pointerId);
@@ -1005,24 +1022,24 @@ canvas.addEventListener('pointermove', (event) => {
   }
   if (precisionZoom && camera === topCamera &&
       event.pointerType === 'mouse' && event.shiftKey) return;
+  // A stray mouse move or secondary finger must not steal an active gesture.
+  if (aimPointerId !== null && event.pointerId !== aimPointerId) return;
   // Do not accidentally re-aim while the finger that placed the white is held.
   if (placementPointerId !== null && !scratchPending) return;
-  if (event.pointerType === 'mouse' || dragging) pointAim(event);
+  if (event.pointerType === 'mouse' || aimPointerId === event.pointerId) pointAim(event);
 });
 canvas.addEventListener('pointerup', (event) => {
   if (finishPan(event)) return;
-  if (placementPointerId === event.pointerId) {
-    if (scratchPending) pointAim(event, true);
-    placementPointerId = null;
-  }
-  dragging = false;
+  finishAimGesture(event, true);
 });
 canvas.addEventListener('pointercancel', (event) => {
-  finishPan(event);
-  dragging = false;
-  placementPointerId = null;
+  if (finishPan(event)) return;
+  finishAimGesture(event);
 });
-canvas.addEventListener('lostpointercapture', (event) => finishPan(event));
+canvas.addEventListener('lostpointercapture', (event) => {
+  if (finishPan(event)) return;
+  finishAimGesture(event);
+});
 
 // On narrow portrait screens the physical balls are only a few pixels wide.
 // Show the actual *first predicted contact* enlarged in the side gutter,
@@ -1382,6 +1399,8 @@ function togglePrecisionZoom() {
   }
   precisionZoom = !precisionZoom;
   panPointer = null;
+  aimPointerId = null;
+  dragging = false;
   precisionManualPan = false;
   precisionFollowActive = false;
   precisionFollowTargetId = null;
