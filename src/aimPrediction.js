@@ -112,6 +112,36 @@ export function predictNeutralStrokeContact(balls, dx, dz, power) {
   };
 }
 
+// Follow/draw makes the exact stopping point and contact timing dependent
+// on stepwise spin transfer. A conservative UPPER BOUND is still possible:
+// all stored spin can at most add 42% of the launch velocity. Pretend it is
+// available instantly (strictly more reach than the real traction model) so
+// even a very soft spin shot never advertises an unreachable distant target.
+// Unlike neutral strokes, this shortened line is NOT a predicted stop point.
+export function predictStrokeContact(balls, dx, dz, power, followDraw = 0) {
+  if (!Number.isFinite(followDraw) || followDraw === 0)
+    return predictNeutralStrokeContact(balls, dx, dz, power);
+  const first = predictFirstContact(balls, dx, dz);
+  if (!first) return null;
+  const cue = balls.find(ball => ball.id === 0);
+  const speed = cueStrikeSpeed(power);
+  const storedSpin = speed * Math.min(1, Math.abs(followDraw)) * 0.42;
+  const generousSpeed = speed + storedSpin;
+  const bound = Math.max(0,
+    generousSpeed * generousSpeed / (2 * TABLE.rollingDeceleration) - 0.025);
+  if (bound + 1e-9 >= first.distance) return { ...first, stopsShort: false };
+  const magnitude = Math.hypot(dx, dz);
+  const distance = Math.min(bound, first.distance);
+  return {
+    x: cue.x + dx / magnitude * distance,
+    z: cue.z + dz / magnitude * distance,
+    distance,
+    ballId: null, jawIndex: null, pocketIndex: null, railAxis: null,
+    stopsShort: true,
+    upperBoundOnly: true,
+  };
+}
+
 // A short neutral-spin direction hint, not a promised second pot. Bound
 // reach by the SAME launch speed, cloth drag and cushion restitution as the
 // deterministic physics. At insufficient power the bank must not be shown.
