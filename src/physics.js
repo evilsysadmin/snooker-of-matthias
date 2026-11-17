@@ -173,16 +173,22 @@ export function stepPhysics(balls, dt, { trackContacts = false } = {}) {
     const maxX = t.halfX - r;
     const maxZ = t.halfZ - r;
     if (Math.abs(b.x) > maxX) {
-      if (trackContacts && Math.sign(b.x) * b.vx > 0.03)
+      // A nearby ball or pocket jaw can correct this centre just outside
+      // the cushion. Reposition it, but reflect ONLY if its velocity still
+      // points into the wall. Otherwise a returning ball gets a fake second
+      // bounce away from the table interior.
+      const outward = Math.sign(b.x) * b.vx;
+      if (trackContacts && outward > 0.03)
         events.push({ type: 'rail', id: b.id, impactSpeed: Math.abs(b.vx) });
       b.x = Math.sign(b.x) * maxX;
-      b.vx *= -t.cushionRestitution;
+      if (outward > 0) b.vx *= -t.cushionRestitution;
     }
     if (Math.abs(b.z) > maxZ) {
-      if (trackContacts && Math.sign(b.z) * b.vz > 0.03)
+      const outward = Math.sign(b.z) * b.vz;
+      if (trackContacts && outward > 0.03)
         events.push({ type: 'rail', id: b.id, impactSpeed: Math.abs(b.vz) });
       b.z = Math.sign(b.z) * maxZ;
-      b.vz *= -t.cushionRestitution;
+      if (outward > 0) b.vz *= -t.cushionRestitution;
     }
     const speed = Math.hypot(b.vx, b.vz);
     if (speed > 0) {
