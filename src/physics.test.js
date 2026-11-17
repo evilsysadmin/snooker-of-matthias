@@ -238,6 +238,46 @@ test('cushions reflect away from pockets', () => {
   assert.equal(balls[0].pocketed, false);
 });
 
+test('correcting a ball already returning from outside a cushion never reverses it outward', () => {
+  const maxX = TABLE.halfX - TABLE.ballRadius;
+  const maxZ = TABLE.halfZ - TABLE.ballRadius;
+  for (const axis of ['x', 'z']) for (const sign of [-1, 1]) {
+    const ball = {
+      id: 4, x: axis === 'x' ? sign * (maxX + 0.04) : 0.55,
+      z: axis === 'z' ? sign * (maxZ + 0.04) : 0.55,
+      vx: axis === 'x' ? -sign * 1.7 : 0,
+      vz: axis === 'z' ? -sign * 1.7 : 0,
+      pocketed: false,
+    };
+    const events = stepPhysics([ball], 1 / 120, { trackContacts: true });
+    const velocity = axis === 'x' ? ball.vx : ball.vz;
+    const limit = axis === 'x' ? maxX : maxZ;
+    assert.ok(velocity * sign < -1.6,
+      'an inward-going ball must remain inward after its centre is clamped');
+    assert.ok(Math.abs(ball[axis]) <= limit + 1e-12,
+      'overshoot correction must return the centre to playable cloth');
+    assert.equal(events.filter((event) => event.type === 'rail').length, 0,
+      'clamping an inward-moving ball is not another physical cushion strike');
+  }
+});
+
+test('ball-to-ball positional overlap near cushion does not create a fake rebound', () => {
+  const maxX = TABLE.halfX - TABLE.ballRadius;
+  const balls = [
+    { id: 0, x: maxX - 0.005, z: 0.4, vx: -3, vz: 0, pocketed: false },
+    { id: 1, x: maxX - 0.16, z: 0.4, vx: 0, vz: 0, pocketed: false },
+  ];
+  const first = stepPhysics(balls, 1 / 120, { trackContacts: true });
+  assert.equal(first.filter(event => event.type === 'contact').length, 1);
+  assert.ok(balls[0].x > maxX, 'overlap correction really pushed the white past the rail');
+  assert.ok(balls[0].vx < -0.055, 'the white is already coming back towards the cloth');
+  const next = stepPhysics(balls, 1 / 120, { trackContacts: true });
+  assert.ok(balls[0].x <= maxX);
+  assert.ok(balls[0].vx <= 0, 'no outward second rebound on the next tick');
+  assert.deepEqual(next.filter(event => event.type === 'rail' && event.id === 0), []);
+  assert.ok(balls.every(b => Number.isFinite(b.x) && Number.isFinite(b.vx)));
+});
+
 test('scratched cue is restored only once all the other balls stop', () => {
   const balls = createRack();
   const cue = balls[0];
