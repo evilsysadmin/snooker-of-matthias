@@ -66,8 +66,10 @@ jobs:
             sleep 1
           done
           npm run smoke
+      # Preserve visual QA on PRs and diagnostics on failures, without
+      # uploading redundant PNGs from healthy main releases.
       - name: Upload browser screenshots
-        if: always()
+        if: ${{ always() && (github.event_name == 'pull_request' || failure()) }}
         uses: actions/upload-artifact@v4
         with:
           name: snooker-desktop-mobile
