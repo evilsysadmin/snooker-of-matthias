@@ -25,6 +25,16 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
+      - name: Regenerate Vite 8 npm lock in trusted Node runner (temporary)
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund --loglevel=error
+          node -e 'const l=require("./package-lock.json"); if(l.packages[""].devDependencies.vite !== "8.3.8") process.exit(1)'
+          echo BEGIN_VITE8_NPM_LOCKFILE_V1
+          cat package-lock.json
+          echo END_VITE8_NPM_LOCKFILE_V1
+          echo "Block source admission until reviewed npm integrity graph committed"
+          exit 1
       - name: Install immutable npm dependency graph
         run: npm ci --no-fund
       - name: Reject high or critical npm advisories
