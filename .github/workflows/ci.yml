@@ -9,8 +9,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: snooker-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Retain CI and source-bound build artifacts for every main commit.
+  # Superseded revisions of one PR may still cancel each other.
+  group: snooker-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
