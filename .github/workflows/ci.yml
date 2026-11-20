@@ -27,6 +27,8 @@ jobs:
           node-version: '22'
       - name: Install immutable npm dependency graph
         run: npm ci --no-fund
+      - name: Reject high or critical npm advisories
+        run: npm audit --audit-level=high
       - name: Deterministic physics tests
         run: npm test
       - name: Production 3D build
