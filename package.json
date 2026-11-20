@@ -14,7 +14,7 @@
     "three": "0.170.0"
   },
   "devDependencies": {
-    "vite": "5.4.12",
+    "vite": "5.4.21",
     "@playwright/test": "1.56.1"
   }
 }
