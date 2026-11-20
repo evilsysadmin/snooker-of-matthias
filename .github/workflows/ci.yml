@@ -25,16 +25,6 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - name: Regenerate corrected npm lock with trusted resolver (temporary)
-        run: |
-          set -euo pipefail
-          npm install --package-lock-only --ignore-scripts --no-fund --no-audit --loglevel=error
-          node -e 'const l=require("./package-lock.json"); if(l.packages[""].devDependencies.vite !== "5.4.21") process.exit(1)'
-          echo BEGIN_PATCHED_NPM_LOCKFILE_V1
-          cat package-lock.json
-          echo END_PATCHED_NPM_LOCKFILE_V1
-          echo "Block PR admission until resolver-generated lock is committed"
-          exit 1
       - name: Install immutable npm dependency graph
         run: npm ci --no-fund
       - name: Reject high or critical npm advisories
