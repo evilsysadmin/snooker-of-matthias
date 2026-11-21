@@ -37,6 +37,30 @@ jobs:
           # A PR artifact is never admitted for staging publication.
           VITE_SOURCE_SHA: ${{ github.sha }}
         run: npm run build
+      - name: Report JavaScript and CSS gzip size (informational)
+        # Baseline at Vite 8.3.8: JS 192.01 kB gzip (issue #71).
+        # Keep security and WebGL checks blocking; budget warning is not.
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const zlib = require('node:zlib');
+          const dir = 'dist/assets';
+          const assets = fs.readdirSync(dir).filter(name => /\.(?:js|css)$/.test(name));
+          if (!assets.some(name => name.endsWith('.js'))) {
+            throw new Error('No bundled JavaScript to measure');
+          }
+          const bytes = { js: 0, css: 0 };
+          for (const name of assets) {
+            const type = name.endsWith('.js') ? 'js' : 'css';
+            bytes[type] += zlib.gzipSync(fs.readFileSync(dir + '/' + name)).length;
+          }
+          const kib = value => (value / 1024).toFixed(2);
+          console.log('SNOOKER_GZIP_BUNDLE js_kib=' + kib(bytes.js)
+            + ' css_kib=' + kib(bytes.css) + ' chunks=' + assets.length);
+          if (bytes.js > 200 * 1024) {
+            console.log('::warning::JavaScript gzip assets exceed the 200 KiB soft budget; review issue #71');
+          }
+          NODE
       - name: Verify build identifies its exact source commit
         env:
           SOURCE_SHA: ${{ github.sha }}
