@@ -1172,6 +1172,25 @@ for (const x of [-TABLE_VIEW_EXTENTS.halfX, TABLE_VIEW_EXTENTS.halfX]) {
   }
 }
 const projectedCorner = new THREE.Vector3();
+
+// Both optical-zoom entry and manual recenter use the same real first
+// predicted contact. A moving table never contributes a stale target.
+function precisionAimTarget(moving = ballsMoving(balls)) {
+  if (moving) return null;
+  const prediction = predictFirstContact(balls, aim.x, aim.z);
+  return prediction?.ballId == null ? null
+    : balls.find((ball) => ball.id === prediction.ballId && !ball.pocketed);
+}
+
+// Exit paths must clear the same manual-pan/follow state, whether the
+// player presses Zoom or switches directly from precision to 3D.
+function resetPrecisionTracking() {
+  panPointer = null;
+  precisionFollowActive = false;
+  precisionFollowTargetId = null;
+  precisionManualPan = false;
+  viewport.dataset.panning = '';
+}
 function changePrecisionZoom(steps, cursorPoint = null) {
   if (!precisionZoom || camera !== topCamera) return;
   const next = adjustPrecisionZoom(precisionZoomLevel, steps);
@@ -1192,10 +1211,7 @@ function recenterPrecisionCamera() {
   if (!precisionZoom || camera !== topCamera || panPointer ||
       !balls[0] || balls[0].pocketed) return;
   const moving = ballsMoving(balls);
-  const prediction = moving ? null : predictFirstContact(balls, aim.x, aim.z);
-  const target = prediction?.ballId == null ? null
-    : balls.find((ball) => ball.id === prediction.ballId && !ball.pocketed);
-  const focus = precisionFocus(balls[0], target);
+  const focus = precisionFocus(balls[0], precisionAimTarget(moving));
   // A return to the white is an explicit camera action, not a new shot.
   // Keep the player's exact zoom and aim, and re-enable follow mid-stroke.
   precisionAnchor = panPrecisionFocus({ x: 0, z: 0 }, focus.x, focus.z,
@@ -1312,11 +1328,7 @@ function resize() {
 function setCameraMode(mode) {
   if (mode === '3d' && precisionZoom) {
     precisionZoom = false;
-    panPointer = null;
-    precisionFollowActive = false;
-    precisionFollowTargetId = null;
-    precisionManualPan = false;
-    viewport.dataset.panning = '';
+    resetPrecisionTracking();
     syncTopFraming();
   }
   camera = mode === '3d' ? perspectiveCamera : topCamera;
@@ -1331,20 +1343,12 @@ perspectiveCameraButton.addEventListener('click', () => setCameraMode('3d'));
 function togglePrecisionZoom() {
   if (!precisionZoom) {
     const cue = balls[0]?.pocketed ? null : balls[0];
-    const prediction = cue && !ballsMoving(balls)
-      ? predictFirstContact(balls, aim.x, aim.z) : null;
-    const target = prediction?.ballId == null ? null
-      : balls.find((ball) => ball.id === prediction.ballId && !ball.pocketed);
-    precisionAnchor = precisionFocus(cue, target);
+    precisionAnchor = precisionFocus(cue, cue ? precisionAimTarget() : null);
   }
   precisionZoom = !precisionZoom;
-  panPointer = null;
+  resetPrecisionTracking();
   aimPointerId = null;
   dragging = false;
-  precisionManualPan = false;
-  precisionFollowActive = false;
-  precisionFollowTargetId = null;
-  viewport.dataset.panning = '';
   setCameraMode('top');
   syncTopFraming();
   lensPositionDirty = true;
