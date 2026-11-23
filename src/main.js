@@ -5,6 +5,7 @@ import {
 import './styles.css';
 import { renderGameMarkup } from './gameMarkup.js';
 import { createShotCharge } from './shotCharge.js';
+import { nextCueSpin, renderCueSpinButton, renderSoundButton } from './controlDisplays.js';
 import { cueIdleGap, cueStrokePose, CUE_TIP_LOCAL_X } from './cueMotion.js';
 import { createCueStick } from './cueVisuals.js';
 import { predictFirstContact, predictFirstRailBounce, predictStrokeContact } from './aimPrediction.js';
@@ -501,13 +502,7 @@ let availableUpdate = false;
 const soundFX = createBilliardsAudio();
 const feedbackGate = createFeedbackGate();
 function syncSoundButton() {
-  const enabled = soundFX.isEnabled();
-  soundToggle.dataset.enabled = String(enabled);
-  soundToggle.setAttribute('aria-pressed', String(enabled));
-  soundToggle.setAttribute('aria-label',
-    enabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido');
-  soundToggle.title = enabled ? 'Efectos sonoros activados' : 'Efectos sonoros desactivados';
-  soundToggle.textContent = enabled ? '🔊' : '🔇';
+  renderSoundButton(soundToggle, soundFX.isEnabled());
 }
 soundToggle.addEventListener('click', () => {
   soundFX.setEnabled(!soundFX.isEnabled());
@@ -562,23 +557,12 @@ function nudgeAim(direction) {
 }
 fineLeft.addEventListener('click', () => nudgeAim(-1));
 fineRight.addEventListener('click', () => nudgeAim(1));
-const spinChoices = [
-  { value: 0, name: 'centro' },
-  { value: 1, name: 'seguimiento' },
-  { value: -1, name: 'retroceso' },
-];
 function updateSpinButton() {
-  const choice = spinChoices.find((item) => item.value === cueSpin);
-  spinButton.querySelector('.spin-name').textContent =
-    choice.value === 0 ? 'Centro' : choice.value > 0 ? 'Sigue' : 'Retro';
-  spinButton.dataset.spin = String(choice.value);
-  spinButton.setAttribute('aria-label', 'Efecto de la blanca: ' + choice.name + '. Pulsa para cambiar');
-  spinButton.title = 'Efecto de la blanca: ' + choice.name + ' · pulsa para cambiar';
+  renderCueSpinButton(spinButton, cueSpin);
 }
 spinButton.addEventListener('click', () => {
   if (ballsMoving(balls) || balls[0].pocketed) return;
-  const index = spinChoices.findIndex((item) => item.value === cueSpin);
-  cueSpin = spinChoices[(index + 1) % spinChoices.length].value;
+  cueSpin = nextCueSpin(cueSpin);
   updateSpinButton();
 });
 updateSpinButton();
