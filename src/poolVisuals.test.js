@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BALL_COLORS, CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, MIN_PRECISION_ZOOM, MAX_PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus, zoomPrecisionFocusAtPoint, followPrecisionFocus, keepCueWithinPrecisionView, PRECISION_CUE_SAFE_FRACTION, STRIPE_IVORY, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS, poolBallSpec,
+  BALL_COLORS, CUE_BALL_MARKER, TOP_CAMERA_FILL, TABLE_VIEW_EXTENTS, tableOrthoFraming, PRECISION_ZOOM, MIN_PRECISION_ZOOM, MAX_PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus, zoomPrecisionFocusAtPoint, followPrecisionFocus, keepCueWithinPrecisionView, PRECISION_CUE_SAFE_FRACTION, STRIPE_IVORY, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS, poolBallSpec,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
 } from './poolVisuals.js';
 
@@ -208,4 +208,22 @@ test('numbered ball skins and cap labels are generated locally', () => {
   createBallTexture(stripes.THREE, 9, stripes.documentRef);
   assert.ok(stripes.actions.some((a) => a[0] === 'rect' && a[1] === STRIPE_IVORY),
     'striped balls must no longer compete with the cue for the same white');
+});
+
+test('one visual tabletop envelope fits portrait and desktop orthographic cameras', () => {
+  assert.deepEqual(TABLE_VIEW_EXTENTS, {halfX: 4.75, halfZ: 2.51, minY: -0.12, maxY: 0.28});
+  for (const [width, height, expectedPortrait] of [
+    [390, 844, true], [700, 810, true], [701, 810, false],
+    [1440, 900, false], [1198, 424, false],
+  ]) {
+    const {aspect, portrait, halfHeight} = tableOrthoFraming(width, height);
+    assert.equal(portrait, expectedPortrait, `wrong orientation for ${width}x${height}`);
+    assert.equal(aspect, width / height);
+    const halfWorldWidth = portrait ? TABLE_VIEW_EXTENTS.halfZ : TABLE_VIEW_EXTENTS.halfX;
+    const halfWorldHeight = portrait ? TABLE_VIEW_EXTENTS.halfX : TABLE_VIEW_EXTENTS.halfZ;
+    assert.ok(halfHeight * TOP_CAMERA_FILL >= halfWorldHeight - 1e-10);
+    assert.ok(halfHeight * aspect * TOP_CAMERA_FILL >= halfWorldWidth - 1e-10);
+  }
+  const compact = tableOrthoFraming(390, 844);
+  assert.ok(compact.halfHeight > 4.75, 'portrait must display complete length of the table');
 });

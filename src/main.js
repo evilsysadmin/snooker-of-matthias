@@ -16,7 +16,7 @@ import { newSoloChallenge, settleSoloShot, readSoloBest, saveSoloBest } from './
 import { createFeedbackGate, createBilliardsAudio } from './shotFeedback.js';
 import { poolBallSpec, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
-  CUE_BALL_MARKER, TOP_CAMERA_FILL, PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus,
+  CUE_BALL_MARKER, TABLE_VIEW_EXTENTS, tableOrthoFraming, PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus,
   followPrecisionFocus, zoomPrecisionFocusAtPoint, keepCueWithinPrecisionView } from './poolVisuals.js';
 
 const app = document.querySelector('#app');
@@ -1188,9 +1188,11 @@ function updateCue(now) {
 // Each camera fits the tabletop within the clear viewport, excluding the HUD.
  // The orthographic view makes aiming distances visually consistent.
 const tableCorners = [];
-for (const x of [-4.75, 4.75]) {
-  for (const y of [-0.12, 0.28]) {
-    for (const z of [-2.51, 2.51]) tableCorners.push(new THREE.Vector3(x, y, z));
+for (const x of [-TABLE_VIEW_EXTENTS.halfX, TABLE_VIEW_EXTENTS.halfX]) {
+  for (const y of [TABLE_VIEW_EXTENTS.minY, TABLE_VIEW_EXTENTS.maxY]) {
+    for (const z of [-TABLE_VIEW_EXTENTS.halfZ, TABLE_VIEW_EXTENTS.halfZ]) {
+      tableCorners.push(new THREE.Vector3(x, y, z));
+    }
   }
 }
 const projectedCorner = new THREE.Vector3();
@@ -1292,15 +1294,8 @@ function resize() {
     if (renderer.getPixelRatio() !== pixelRatio) renderer.setPixelRatio(pixelRatio);
     renderer.setSize(width, height, false);
   }
-  const aspect = width / height;
-  const portrait = width <= 700 && height > width * 1.15;
-
-  // Desktop: baulk to the left. Portrait: turn the tabletop lengthwise.
-  // Orthographic scaling is determined by *both* axes and the available viewport.
-  const halfWorldWidth = portrait ? 2.51 : 4.75;
-  const halfWorldHeight = portrait ? 4.75 : 2.51;
-  const halfHeight = Math.max(halfWorldHeight / TOP_CAMERA_FILL,
-    halfWorldWidth / (aspect * TOP_CAMERA_FILL));
+  // Portrait rotates the tabletop; the viewport's limiting axis determines fit.
+  const {aspect, portrait, halfHeight} = tableOrthoFraming(width, height);
   topCamera.left = -halfHeight * aspect;
   topCamera.right = halfHeight * aspect;
   topCamera.top = halfHeight;

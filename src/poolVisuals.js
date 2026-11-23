@@ -13,6 +13,22 @@ export const BALL_COLORS = Object.freeze([
 // laptops. Keep a 1.2% safety margin on the limiting axis so all six pockets
 // and rails remain visible. Actual balls/collisions share the physics radius.
 export const TOP_CAMERA_FILL = 0.988;
+// The visual frame includes timber rails and corner pockets; it is larger
+// than TABLE's playable halfX/halfZ collision bounds. Keep it independent
+// from physics and share it between both 3D and top-down camera fitting.
+export const TABLE_VIEW_EXTENTS = Object.freeze({halfX: 4.75, halfZ: 2.51, minY: -0.12, maxY: 0.28});
+
+// The frustum is determined by the limiting viewport axis, not a hardcoded
+// screen width. This pure calculation is shared by portrait and desktop.
+export function tableOrthoFraming(width, height) {
+  const aspect = width / height;
+  const portrait = width <= 700 && height > width * 1.15;
+  const halfWorldWidth = portrait ? TABLE_VIEW_EXTENTS.halfZ : TABLE_VIEW_EXTENTS.halfX;
+  const halfWorldHeight = portrait ? TABLE_VIEW_EXTENTS.halfX : TABLE_VIEW_EXTENTS.halfZ;
+  const halfHeight = Math.max(halfWorldHeight / TOP_CAMERA_FILL,
+    halfWorldWidth / (aspect * TOP_CAMERA_FILL));
+  return {aspect, portrait, halfHeight};
+}
 // Optical-only precision aid: ball physics and pocket sizes are unchanged.
 export const PRECISION_ZOOM = 1.4;
 export const MIN_PRECISION_ZOOM = 1.2;
