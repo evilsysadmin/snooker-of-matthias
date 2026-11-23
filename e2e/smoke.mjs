@@ -1133,7 +1133,14 @@ try {
   await widePage.locator('#camera-3d').click();
   assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'full',
     'changing to 3D restores full-table framing');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-panning'), '',
+    'leaving precision for 3D clears the manual pan gesture');
+  assert.equal(await widePage.locator('#precision-recenter').isVisible(), false,
+    '3D exits manual optical framing instead of retaining recovery controls');
   await widePage.locator('#camera-top').click();
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-zoom'), 'full');
+  assert.equal(await widePage.locator('#viewport').getAttribute('data-camera-focus-x'), '0.000',
+    'return to top view starts from the actual full-table origin');
   const widePng = await widePage.screenshot({
     path: 'artifacts/snooker-wide-desktop-top.png',
     fullPage: true, animations: 'disabled',
