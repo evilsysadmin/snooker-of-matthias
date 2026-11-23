@@ -4,7 +4,7 @@ import { renderGameMarkup } from './gameMarkup.js';
 
 test('initial game UI keeps uniquely addressable controls', () => {
   const markup = renderGameMarkup(15);
-  const ids = [...markup.matchAll(/\\bid="([^"]+)"/g)].map((match) => match[1]);
+  const ids = [...markup.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
   assert.ok(ids.length > 20, 'expected the real game control DOM');
   assert.equal(new Set(ids).size, ids.length, 'duplicate ids would break querySelector');
   for (const id of [
