@@ -51,6 +51,19 @@ export function newSoloChallenge(best = null) {
   };
 }
 
+// Derive Solo 15 HUD copy from actual simulator state, not from DOM events.
+export function soloStatusText(state) {
+  const best = state.best
+    ? 'Récord: ' + state.best.shots + ' tiros' +
+      (state.best.scratches ? ' · ' + state.best.scratches + ' faltas' : '')
+    : 'Sin récord';
+  return state.completed
+    ? (state.record ? '🏆 ¡Nuevo récord!' : '✓ Mesa limpia') +
+      ' · ' + state.shots + ' tiros · ' + best
+    : '🎱 Desafío 15 · ' + state.remaining + ' restantes · racha ' +
+      state.streak + ' · ' + best;
+}
+
 // Call exactly once when all balls have stopped after a real stroke.
 export function settleSoloShot(state, { pottedIds = [], scratch = false, remaining } = {}) {
   if (!state || state.completed || !Array.isArray(pottedIds) ||
