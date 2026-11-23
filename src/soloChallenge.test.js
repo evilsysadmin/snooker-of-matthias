@@ -1,11 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  SOLO_BEST_KEY, newSoloChallenge, readSoloBest, saveSoloBest, settleSoloShot,
+  SOLO_BEST_KEY, newSoloChallenge, readSoloBest, saveSoloBest, settleSoloShot, soloStatusText,
 } from './soloChallenge.js';
 
 const settle = (state, ids = [], scratch = false) =>
   settleSoloShot(state, { pottedIds: ids, scratch, remaining: state.remaining - ids.length });
+
+test('Solo 15 HUD text reflects real shots, streaks, prior records and completion', () => {
+  assert.equal(soloStatusText(newSoloChallenge()), '🎱 Desafío 15 · 15 restantes · racha 0 · Sin récord');
+  const prior = { shots: 18, scratches: 2 };
+  let state = newSoloChallenge(prior);
+  assert.match(soloStatusText(state), /Récord: 18 tiros · 2 faltas$/);
+  state = settle(state, [1]);
+  assert.equal(soloStatusText(state), '🎱 Desafío 15 · 14 restantes · racha 1 · Récord: 18 tiros · 2 faltas');
+  state = settle(state);
+  assert.equal(soloStatusText(state), '🎱 Desafío 15 · 14 restantes · racha 0 · Récord: 18 tiros · 2 faltas');
+
+  let record = newSoloChallenge(prior);
+  for (let id = 1; id <= 15; id++) record = settle(record, [id]);
+  assert.equal(soloStatusText(record), '🏆 ¡Nuevo récord! · 15 tiros · Récord: 15 tiros');
+
+  let notRecord = newSoloChallenge({ shots: 10, scratches: 1 });
+  for (let id = 1; id <= 15; id++) notRecord = settle(notRecord, [id]);
+  assert.equal(soloStatusText(notRecord), '✓ Mesa limpia · 15 tiros · Récord: 10 tiros · 1 faltas');
+});
 
 test('solo challenge starts clean and never invents a personal best', () => {
   const s = newSoloChallenge();

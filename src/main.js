@@ -12,7 +12,7 @@ import { FINE_AIM_STEP_DEGREES, rotateAim } from './fineAim.js';
 import { resolveStrokePower } from './strokeInteraction.js';
 import { remainingObjectBalls } from './practiceRules.js';
 import { canShowUpdateNotice, createVersionWatcher } from './versionNotice.js';
-import { newSoloChallenge, settleSoloShot, readSoloBest, saveSoloBest } from './soloChallenge.js';
+import { newSoloChallenge, settleSoloShot, readSoloBest, saveSoloBest, soloStatusText } from './soloChallenge.js';
 import { createFeedbackGate, createBilliardsAudio } from './shotFeedback.js';
 import { poolBallSpec, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
@@ -563,9 +563,9 @@ function nudgeAim(direction) {
 fineLeft.addEventListener('click', () => nudgeAim(-1));
 fineRight.addEventListener('click', () => nudgeAim(1));
 const spinChoices = [
-  { value: 0, label: '● Centro', name: 'centro' },
-  { value: 1, label: '↑ Sigue', name: 'seguimiento' },
-  { value: -1, label: '↓ Retro', name: 'retroceso' },
+  { value: 0, name: 'centro' },
+  { value: 1, name: 'seguimiento' },
+  { value: -1, name: 'retroceso' },
 ];
 function updateSpinButton() {
   const choice = spinChoices.find((item) => item.value === cueSpin);
@@ -593,15 +593,7 @@ function syncSoloUI() {
   tableLabel.hidden = challenge;
   viewport.dataset.gameMode = challenge ? 'solo' : 'practice';
   if (!challenge) return;
-  const best = solo.best
-    ? 'Récord: ' + solo.best.shots + ' tiros' +
-      (solo.best.scratches ? ' · ' + solo.best.scratches + ' faltas' : '')
-    : 'Sin récord';
-  soloStatus.textContent = solo.completed
-    ? (solo.record ? '🏆 ¡Nuevo récord!' : '✓ Mesa limpia') +
-      ' · ' + solo.shots + ' tiros · ' + best
-    : '🎱 Desafío 15 · ' + solo.remaining + ' restantes · racha ' +
-      solo.streak + ' · ' + best;
+  soloStatus.textContent = soloStatusText(solo);
   soloStatus.dataset.shots = String(solo.shots);
   soloStatus.dataset.remaining = String(solo.remaining);
   soloStatus.dataset.scratches = String(solo.scratches);
