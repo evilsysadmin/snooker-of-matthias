@@ -13,7 +13,7 @@ import { FINE_AIM_STEP_DEGREES, rotateAim } from './fineAim.js';
 import { resolveStrokePower } from './strokeInteraction.js';
 import { remainingObjectBalls } from './practiceRules.js';
 import { canShowUpdateNotice, createVersionWatcher } from './versionNotice.js';
-import { newSoloChallenge, settleSoloShot, readSoloBest, saveSoloBest, soloStatusText } from './soloChallenge.js';
+import { newSoloChallenge, settleSoloShot, readSoloBest, saveSoloBest, soloStatusText, soloShotCommentary } from './soloChallenge.js';
 import { createFeedbackGate, createBilliardsAudio } from './shotFeedback.js';
 import { poolBallSpec, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
@@ -1422,20 +1422,9 @@ function frame(now) {
     });
     soloShotStarted = false;
     soloShotEvents = [];
-    if (solo.completed) {
-      if (solo.record) saveSoloBest(solo.best);
-      say(solo.record
-        ? 'Matthias: ¡Mesa limpia en ' + solo.shots + ' tiros! Nuevo récord. Admitiré que es respetable.'
-        : 'Matthias: Mesa limpia en ' + solo.shots + ' tiros. La próxima vez, supera tu marca.');
-    } else if (solo.last.kind === 'scratch') {
-      say('Matthias: Blanca embocada. Falta registrada. Tu racha, al cementerio.');
-    } else if (solo.last.kind === 'multi') {
-      say('Matthias: ' + solo.last.balls + ' bolas en un tiro. Una rareza estadísticamente agradable.');
-    } else if (solo.last.kind === 'pot' && solo.streak >= 2) {
-      say('Matthias: ' + solo.streak + ' tiros embocando seguidos. Empiezo a preocuparme.');
-    } else if (solo.last.kind === 'miss') {
-      say('Matthias: Un tiro y ninguna bola. El billar sigue invicto.');
-    }
+    if (solo.completed && solo.record) saveSoloBest(solo.best);
+    const reaction = soloShotCommentary(solo);
+    if (reaction) say(reaction);
     syncSoloUI();
     dirtyHUD = true;
   }

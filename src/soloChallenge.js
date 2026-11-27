@@ -45,7 +45,7 @@ export function newSoloChallenge(best = null) {
     throw new TypeError('Invalid solo best');
   return {
     shots: 0, potted: 0, remaining: SOLO_BALL_COUNT,
-    scratches: 0, streak: 0, bestStreak: 0,
+    scratches: 0, streak: 0, bestStreak: 0, dryStreak: 0,
     completed: false, best, record: false,
     last: { kind: 'ready', balls: 0, scratch: false },
   };
@@ -95,6 +95,7 @@ export function settleSoloShot(state, { pottedIds = [], scratch = false, remaini
     ...state,
     shots, scratches, streak,
     bestStreak: Math.max(state.bestStreak, streak),
+    dryStreak: unique.size === 0 && !scratch ? state.dryStreak + 1 : 0,
     remaining, potted: SOLO_BALL_COUNT - remaining,
     completed, record,
     best: record ? candidate : state.best,
@@ -104,4 +105,31 @@ export function settleSoloShot(state, { pottedIds = [], scratch = false, remaini
       balls: unique.size, scratch,
     },
   };
+}
+
+// Feedback from settled shots only. Do not infer cue angle, power or intent.
+export function soloShotCommentary(state) {
+  if (state.completed) {
+    const shots = state.shots + (state.shots === 1 ? ' tiro' : ' tiros');
+    return state.record
+      ? 'Matthias: ¡Mesa limpia en ' + shots + '! Nuevo récord. Respetable.'
+      : 'Matthias: Mesa limpia en ' + shots + '. Mejor racha: ' + state.bestStreak + '.';
+  }
+  if (state.last.kind === 'scratch') {
+    return 'Matthias: Blanca en mano. Elige un hueco libre en la mesa, o pulsa COLOCAR.';
+  }
+  if (state.last.kind === 'multi') {
+    return 'Matthias: ' + state.last.balls + ' bolas de un tiro. La geometría te sonríe.';
+  }
+  if (state.last.kind === 'pot') {
+    if (state.streak >= 3) return 'Matthias: Racha de ' + state.streak + '. Empiezo a temer por mi empleo.';
+    if (state.streak === 2) return 'Matthias: Dos tiros seguidos embocando. Mantén ese ritmo.';
+    return 'Matthias: Una dentro. Piensa también dónde quedará la blanca.';
+  }
+  if (state.last.kind === 'miss') {
+    if (state.dryStreak >= 3) return 'Matthias: ' + state.dryStreak + ' tiros sin embocar. Prueba un tiro sencillo.';
+    if (state.dryStreak === 2) return 'Matthias: Dos tiros en seco. Usa la vista cenital para apuntar.';
+    return 'Matthias: Un tiro y ninguna bola. El billar sigue invicto.';
+  }
+  return null;
 }

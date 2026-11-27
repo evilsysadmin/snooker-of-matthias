@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  SOLO_BEST_KEY, newSoloChallenge, readSoloBest, saveSoloBest, settleSoloShot, soloStatusText,
+  SOLO_BEST_KEY, newSoloChallenge, readSoloBest, saveSoloBest, settleSoloShot, soloStatusText, soloShotCommentary,
 } from './soloChallenge.js';
 
 const settle = (state, ids = [], scratch = false) =>
@@ -159,4 +159,38 @@ test('record chase respects scratch tiebreak and hides pressure after a real fin
   assert.match(soloStatusText(scratch), /Marca fuera de alcance$/);
   assert.equal(settle(s, ids, true).record, false);
   assert.doesNotMatch(soloStatusText(newSoloChallenge()), /Margen|fuera de alcance/);
+});
+
+test('Matthias responds to actual consecutive dry shots, not guessed technique', () => {
+  let s = newSoloChallenge();
+  assert.equal(soloShotCommentary(s), null);
+  s = settle(s);
+  assert.equal(s.dryStreak, 1);
+  assert.match(soloShotCommentary(s), /Un tiro/);
+  s = settle(s);
+  assert.match(soloShotCommentary(s), /Dos tiros.*vista cenital/);
+  s = settle(s);
+  assert.match(soloShotCommentary(s), /3 tiros sin embocar/);
+  s = settle(s, [1]);
+  assert.equal(s.dryStreak, 0);
+  assert.match(soloShotCommentary(s), /Una dentro/);
+  s = settle(s, [2]);
+  assert.match(soloShotCommentary(s), /Dos tiros seguidos/);
+  s = settle(s, [3]);
+  assert.match(soloShotCommentary(s), /Racha de 3/);
+  s = settle(s, [4,5]);
+  assert.match(soloShotCommentary(s), /2 bolas/);
+  s = settle(s);
+  s = settle(s, [], true);
+  assert.equal(s.dryStreak, 0);
+  assert.match(soloShotCommentary(s), /Blanca en mano.*COLOCAR/);
+  assert.equal(newSoloChallenge(s.best).dryStreak, 0);
+});
+
+test('completion feedback reports actual record or best streak', () => {
+  const ids = Array.from({ length: 15 }, (_, i) => i + 1);
+  const record = settle(newSoloChallenge(), ids);
+  assert.match(soloShotCommentary(record), /1 tiro.*Nuevo récord/);
+  const old = settle(settle(newSoloChallenge({ shots: 1, scratches: 0 })), ids);
+  assert.match(soloShotCommentary(old), /2 tiros.*Mejor racha: 1/);
 });
