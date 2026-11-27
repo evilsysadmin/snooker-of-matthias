@@ -131,3 +131,32 @@ test('blocked localStorage degrades safely; invalid saves cannot poison best', (
   }),false);
   assert.equal(called,false);
 });
+
+test('record chase reveals remaining shot budget only near the limit', () => {
+  let s = newSoloChallenge({ shots: 5, scratches: 0 });
+  assert.doesNotMatch(soloStatusText(s), /Margen|fuera de alcance/);
+  s = settle(s);
+  assert.match(soloStatusText(s), /Margen: 3 tiros$/);
+  s = settle(s);
+  s = settle(s);
+  assert.match(soloStatusText(s), /Margen: 1 tiro$/);
+  s = settle(s);
+  assert.match(soloStatusText(s), /Marca fuera de alcance$/);
+  s = settle(s, Array.from({ length: 15 }, (_, i) => i + 1));
+  assert.equal(s.record, false);
+  assert.doesNotMatch(soloStatusText(s), /Margen|fuera de alcance/);
+});
+
+test('record chase respects scratch tiebreak and hides pressure after a real finish', () => {
+  let s = newSoloChallenge({ shots: 2, scratches: 1 });
+  s = settle(s);
+  assert.match(soloStatusText(s), /Margen: 1 tiro$/);
+  const ids = Array.from({ length: 15 }, (_, i) => i + 1);
+  const clean = settle(s, ids);
+  assert.equal(clean.record, true);
+  assert.doesNotMatch(soloStatusText(clean), /Margen|fuera de alcance/);
+  const scratch = settle(s, [], true);
+  assert.match(soloStatusText(scratch), /Marca fuera de alcance$/);
+  assert.equal(settle(s, ids, true).record, false);
+  assert.doesNotMatch(soloStatusText(newSoloChallenge()), /Margen|fuera de alcance/);
+});
