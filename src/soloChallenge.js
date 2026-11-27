@@ -57,11 +57,19 @@ export function soloStatusText(state) {
     ? 'Récord: ' + state.best.shots + ' tiros' +
       (state.best.scratches ? ' · ' + state.best.scratches + ' faltas' : '')
     : 'Sin récord';
+  // Optimistic shot budget: a tie in strokes wins only with fewer scratches.
+  // This never predicts the physics or promises a record.
+  const budget = state.best
+    ? state.best.shots - state.shots - Number(state.scratches >= state.best.scratches)
+    : null;
+  const pressure = budget === null || budget > 3 ? '' :
+    budget <= 0 ? ' · Marca fuera de alcance' :
+    ' · Margen: ' + budget + (budget === 1 ? ' tiro' : ' tiros');
   return state.completed
     ? (state.record ? '🏆 ¡Nuevo récord!' : '✓ Mesa limpia') +
       ' · ' + state.shots + ' tiros · ' + best
     : '🎱 Desafío 15 · ' + state.remaining + ' restantes · racha ' +
-      state.streak + ' · ' + best;
+      state.streak + ' · ' + best + pressure;
 }
 
 // Call exactly once when all balls have stopped after a real stroke.
