@@ -15,6 +15,7 @@ import { remainingObjectBalls } from './practiceRules.js';
 import { canShowUpdateNotice, createVersionWatcher } from './versionNotice.js';
 import { newSoloChallenge, settleSoloShot, readSoloBest, saveSoloBest, soloStatusText } from './soloChallenge.js';
 import { createFeedbackGate, createBilliardsAudio } from './shotFeedback.js';
+import { describeShotSummary } from './shotSummary.js';
 import { poolBallSpec, LONG_RAIL_SIGHTS, SHORT_RAIL_SIGHTS,
   createFeltTexture, createWalnutTexture, createBallTexture, createNumberTexture,
   CUE_BALL_MARKER, TABLE_VIEW_EXTENTS, tableOrthoFraming, PRECISION_ZOOM, adjustPrecisionZoom, precisionFocus, panPrecisionFocus,
@@ -49,6 +50,7 @@ const charge = createShotCharge();
 const modePractice = document.querySelector('#mode-practice');
 const modeSolo = document.querySelector('#mode-solo');
 const soloStatus = document.querySelector('#solo-status');
+const shotSummary = document.querySelector('#shot-summary');
 const soundToggle = document.querySelector('#sound-toggle');
 const tableLabel = document.querySelector('.table-label');
 const updateBanner = document.querySelector('#update-banner');
@@ -498,6 +500,8 @@ let mode = 'practice'; // Solo challenge is opt-in; free practice stays the defa
 let solo = newSoloChallenge(readSoloBest());
 let soloShotEvents = [];
 let soloShotStarted = false;
+let shotEvents = [];
+let shotInProgress = false;
 let availableUpdate = false;
 const soundFX = createBilliardsAudio();
 const feedbackGate = createFeedbackGate();
@@ -568,6 +572,13 @@ spinButton.addEventListener('click', () => {
 updateSpinButton();
 
 function say(message) { commentary.textContent = message; }
+function showShotSummary(result) {
+  const summary = describeShotSummary(result);
+  shotSummary.textContent = summary.label;
+  shotSummary.dataset.kind = summary.kind;
+  shotSummary.title = summary.detail;
+  shotSummary.hidden = false;
+}
 
 function syncSoloUI() {
   const challenge = mode === 'solo';
@@ -625,6 +636,11 @@ function restart() {
   solo = newSoloChallenge(readSoloBest() ?? solo.best);
   soloShotEvents = [];
   soloShotStarted = false;
+  shotEvents = [];
+  shotInProgress = false;
+  shotSummary.hidden = true;
+  shotSummary.textContent = '';
+  delete shotSummary.dataset.kind;
   shots = 0;
   potted = 0;
   scratchPending = false;
@@ -665,6 +681,8 @@ function shoot(power = Number(powerInput.value) / 100) {
     // WebAudio is created only by a real user shot, never at page load.
     soundFX.unlock();
     soundFX.play('strike', power);
+    shotInProgress = true;
+    shotEvents = [];
     if (mode === 'solo') {
       soloShotStarted = true;
       soloShotEvents = [];
@@ -1397,6 +1415,7 @@ function frame(now) {
     for (const feedback of feedbackGate.consume(events, now))
       soundFX.play(feedback.type, feedback.strength);
     if (mode === 'solo' && soloShotStarted) soloShotEvents.push(...events);
+    if (shotInProgress) shotEvents.push(...events);
     for (const event of events) {
       if (event.type === 'scratch' || event.type === 'potted') flashPocket(event, now);
       if (event.type === 'scratch') {
@@ -1413,6 +1432,13 @@ function frame(now) {
     accumulator -= FIXED_DT;
   }
   const nowMoving = ballsMoving(balls);
+  if (!nowMoving && wasMoving && shotInProgress) {
+    const pottedIds = shotEvents.filter((event) => event.type === 'potted').map((event) => event.id);
+    const scratch = shotEvents.some((event) => event.type === 'scratch');
+    showShotSummary({ pottedIds, scratch });
+    shotInProgress = false;
+    shotEvents = [];
+  }
   if (!nowMoving && wasMoving && mode === 'solo' && soloShotStarted) {
     const actualPots = soloShotEvents
       .filter((event) => event.type === 'potted').map((event) => event.id);
