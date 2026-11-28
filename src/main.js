@@ -572,6 +572,12 @@ spinButton.addEventListener('click', () => {
 updateSpinButton();
 
 function say(message) { commentary.textContent = message; }
+function clearShotSummary() {
+  shotSummary.hidden = true;
+  shotSummary.textContent = '';
+  delete shotSummary.dataset.kind;
+  shotSummary.removeAttribute('title');
+}
 function showShotSummary(result) {
   const summary = describeShotSummary(result);
   shotSummary.textContent = summary.label;
@@ -638,9 +644,7 @@ function restart() {
   soloShotStarted = false;
   shotEvents = [];
   shotInProgress = false;
-  shotSummary.hidden = true;
-  shotSummary.textContent = '';
-  delete shotSummary.dataset.kind;
+  clearShotSummary();
   shots = 0;
   potted = 0;
   scratchPending = false;
@@ -681,6 +685,7 @@ function shoot(power = Number(powerInput.value) / 100) {
     // WebAudio is created only by a real user shot, never at page load.
     soundFX.unlock();
     soundFX.play('strike', power);
+    clearShotSummary();
     shotInProgress = true;
     shotEvents = [];
     if (mode === 'solo') {
