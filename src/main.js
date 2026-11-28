@@ -572,6 +572,10 @@ spinButton.addEventListener('click', () => {
 updateSpinButton();
 
 function say(message) { commentary.textContent = message; }
+function clearShotSummary() {
+  clearShotSummary();
+  shotSummary.removeAttribute('title');
+}
 function showShotSummary(result) {
   const summary = describeShotSummary(result);
   shotSummary.textContent = summary.label;
@@ -681,6 +685,7 @@ function shoot(power = Number(powerInput.value) / 100) {
     // WebAudio is created only by a real user shot, never at page load.
     soundFX.unlock();
     soundFX.play('strike', power);
+    clearShotSummary();
     shotInProgress = true;
     shotEvents = [];
     if (mode === 'solo') {
