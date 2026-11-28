@@ -23,6 +23,13 @@ test('ball count is rendered from the physics rules, not hardcoded', () => {
   assert.doesNotMatch(renderGameMarkup(3), /15 en mesa/);
 });
 
+test('initial markup reserves an accessible factual shot result', () => {
+  const markup = renderGameMarkup(15);
+  assert.match(markup, /id="shot-summary"/);
+  assert.match(markup, /id="shot-summary"[^>]*role="status"/);
+  assert.match(markup, /id="shot-summary"[^>]*hidden/);
+});
+
 test('initial markup contains accessible status and controls', () => {
   const markup = renderGameMarkup(15);
   assert.match(markup, /id="commentary" role="status"/);
