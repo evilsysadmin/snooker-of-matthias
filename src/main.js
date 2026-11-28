@@ -573,7 +573,9 @@ updateSpinButton();
 
 function say(message) { commentary.textContent = message; }
 function clearShotSummary() {
-  clearShotSummary();
+  shotSummary.hidden = true;
+  shotSummary.textContent = '';
+  delete shotSummary.dataset.kind;
   shotSummary.removeAttribute('title');
 }
 function showShotSummary(result) {
@@ -642,9 +644,7 @@ function restart() {
   soloShotStarted = false;
   shotEvents = [];
   shotInProgress = false;
-  shotSummary.hidden = true;
-  shotSummary.textContent = '';
-  delete shotSummary.dataset.kind;
+  clearShotSummary();
   shots = 0;
   potted = 0;
   scratchPending = false;
