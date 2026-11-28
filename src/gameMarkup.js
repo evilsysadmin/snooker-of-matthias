@@ -41,7 +41,7 @@ export function renderGameMarkup(objectBallCount) {
   '</div>',
   '<section class="bottom-panel" aria-label="Controles de billar">',
     '<div class="commentary"><div class="monogram">M</div><div>',
-    '<small>MATTHIAS · CRÍTICO DE PRECISIÓN</small>',
+    '<small>MATTHIAS · CRÍTICO DE PRECISIÓN <span id="shot-summary" class="shot-summary" role="status" aria-live="polite" hidden></span></small>',
     '<p id="commentary" role="status">Guten Abend. Apunta sobre la mesa, elige potencia y golpea. Procura no humillarte.</p>',
     '</div></div>',
     '<div class="shot-controls">',
